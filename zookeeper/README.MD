@@ -646,7 +646,7 @@ zookeeper使用了设计模式中的**观察者模式**。客户端注册监听�
 
 为了获得可靠的 ZooKeeper 服务，您应该将 ZooKeeper 部署在一个称为*ensemble*的集群中。只要大多数合奏都已启动，该服务就可用。因为 Zookeeper 需要多数，所以最好使用奇数台机器。比如有四台机器的ZooKeeper只能处理一台机器的故障；如果两台机器出现故障，剩下的两台机器不构成多数。然而，有了五台机器，ZooKeeper 可以处理两台机器的故障。
 
-> 正如[ZooKeeper Getting Started Guide 中](https://zookeeper.apache.org/doc/r3.7.0/zookeeperStarted.html)提到的，容错集群设置至少需要三台服务器，强烈建议您使用奇数台服务器。
+> 正如[ZooKeeper Getting Started Guide ]中(https://zookeeper.apache.org/doc/r3.7.0/zookeeperStarted.html)提到的，容错集群设置至少需要三台服务器，强烈建议您使用奇数台服务器。
 >
 > 通常三台服务器对于生产安装来说已经足够了，但是为了在维护期间获得最大的可靠性，您可能希望安装五台服务器。对于三台服务器，如果您对其中一台进行维护，则在维护期间，其他两台服务器中的一台很容易发生故障。如果您有五个在运行，您可以将其中一个停机进行维护，并且知道如果其他四个中的一个突然出现故障，您仍然可以正常工作。
 >
@@ -695,7 +695,7 @@ QuorumPeerMain 启动 ZooKeeper 服务器，还注册了[JMX](http://java.sun.co
 
 ❌**快速搭建的读者，请跳过此节**❌
 
-配置文件的官方参数解释[官方配置参数](https://zookeeper.apache.org/doc/r3.7.0/zookeeperAdmin.html#sc_configuration)，下面的代码示例将不会介绍这些参数：
+配置文件的官方参数解释[官方配置参数](https://zookeeper.apache.org/doc/r3.7.0/zookeeperAdmin.html#sc_configuration)。
 
 ZooKeeper 的行为由 ZooKeeper 配置文件控制。该文件的设计使得组成 ZooKeeper 服务器的所有服务器都可以使用完全相同的文件，假设磁盘布局相同。如果服务器使用不同的配置文件，必须注意确保所有不同配置文件中的服务器列表匹配。
 
