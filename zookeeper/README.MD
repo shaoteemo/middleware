@@ -529,6 +529,88 @@ bash delete /persistent
 
 ## 实战演练
 
+### 1.实战目标
+
+使用RMI技术和Zookeeper实现一个RPC调用。
+
+RPC：RPC（Remote Procedure Call）远程过程调用。
+
+### 2.扩展知识
+
+#### 2.1.什么是RMI
+
+[本节取自Java官方文档：[RMI](https://docs.oracle.com/javase/tutorial/rmi/index.html)。更多核心的内容文档翻译会在技术仓库中存放]
+
+Remote Method Invocation（RMI） 应用程序通常包括两个独立的程序，一个服务器和一个客户端。典型的服务器程序创建一些远程对象，使这些对象的引用可访问，并等待客户端调用这些对象上的方法。典型的客户端程序获取对服务器上一个或多个远程对象的远程引用，然后调用它们的方法。RMI 提供了服务器和客户端通信和来回传递信息的机制。这种应用程序有时被称为分布式对象应用程序。
+
+分布式对象应用需要做到以下几点：
+
+- **Locate remote objects.** 应用程序可以使用各种机制来获取对远程对象的引用。例如，应用程序可以使用 RMI 的简单命名工具 RMI 注册表注册其远程对象。或者，应用程序可以传递和返回远程对象引用作为其他远程调用的一部分。
+- **Communicate with remote objects.** 远程对象之间的通信细节由 RMI 处理。对于程序员来说，远程通信看起来类似于常规的 Java 方法调用。
+- **Load class definitions for objects that are passed around.** 因为 RMI 使对象能够来回传递，所以它提供了加载对象的类定义以及传输对象数据的机制。
+
+下图描述了一个 RMI 分布式应用程序，它使用 RMI **注册表（ registry ）**来获取对**远程对象（remote object）**的引用。服务器调用 registry 以将名称与远程对象关联（或**绑定（bind）**）。客户端在服务器的注册表中通过名称**查找（looks up）**远程对象，然后**调用（invokes）**它的方法。该图还显示 RMI 系统使用现有的 Web 服务器在需要时为对象**加载类定义（load class definitions）**，从服务器到客户端，从客户端到服务器。
+
+![](http://rep.shaoteemo.com/rmi-2.gif)
+
+......更多详情请查看官方文档。
+
+#### 2.2.RMI部分API介绍
+
+##### 2.2.1java.rmi.Remote接口
+
+![](http://rep.shaoteemo.com/rmi_api_interface.png)
+
+##### 2.2.2. java.rmi.RemoteException异常
+
+作为远程接口的成员，无论是哪一个允许远程调用方法。此方法必须定义为能够抛出 java.rmi.RemoteException。此异常由 RMI 系统从远程方法调用中抛出，以指示发生了通信故障或协议错误。 RemoteException 是一个已检查的异常，因此任何调用远程方法的代码都需要通过捕获它或在它的 throws 子句中声明它来处理此异常。
+
+##### 2.2.3.java.rmi.server.UnicastRemoteObject类
+
+此类实现了Remote 接口和Serializable 接口。自定义接口实现类除了实现自定义接口还需要继承此类。
+
+##### 2.2.4.java.rmi.registry.LocateRegistry
+
+java.rmi.registry.Registry 远程接口是用于绑定（或注册）和在注册表中查找远程对象的 API。 java.rmi.registry.LocateRegistry 类提供静态方法，用于合成对特定网络地址（主机和端口）处的注册表的远程引用。这些方法在不执行任何远程通信的情况下创建包含指定网络地址的远程引用对象。 LocateRegistry 还提供了用于在当前 Java 虚拟机中创建新注册表的静态方法，尽管本示例没有使用这些方法。一旦远程对象在本地主机上的 RMI 注册表中注册，任何主机上的客户端都可以按名称查找远程对象，获取其引用，然后调用该对象上的远程方法。注册表可以由主机上运行的所有服务器共享，或者单个服务器进程可以创建和使用自己的注册表。
+
+##### 2.2.5.java.rmi.Naming
+
+Naming类提供了在远程对象注册表中存储和获取对远程对象的引用的方法。
+
+简言之这个类：对于Server提供绑定对象映射，对于Client提供获取对象映射。
+
+### 3.实践步骤
+
+#### 3.1编写RMI服务器
+
+[官方文档](https://docs.oracle.com/javase/tutorial/rmi/server.html)
+
+查看源码：
+
+```java
+com.shaoteemo.zookeeper.service.RmiMethodService
+com.shaoteemo.zookeeper.practice.service.impl.RmiMethodServiceImpl
+com.shaoteemo.zookeeper.practice.RmiClient
+```
+
+#### 3.2编写RMI客户端
+
+查看代码：
+
+```java
+com.shaoteemo.zookeeper.practice.RmiClient
+```
+
+#### 3.3.运行项目
+
+3.3.1.运行com.shaoteemo.zookeeper.practice.ZookeeperPracticeApplication启动RMI客户端。
+
+![](http://rep.shaoteemo.com/zookeeper_rmi_server_run.png)
+
+3.3.2.运行com.shaoteemo.zookeeper.practice.RmiClientTest#rmiClient测试方法模拟接口调用做加法运算。
+
+![](http://rep.shaoteemo.com/zookeeper_rmi_rpc_invoke.png)
+
 ## 高级进阶
 
 ### 1.Zookeeper存储结构

@@ -21,7 +21,6 @@ import java.io.IOException;
  * @date 2021/10/3
  * @since 1.0
  */
-@SpringBootTest(classes = ZookeeperApplication.class)
 public class ZNodeOperate {
 
     private final Logger log = LoggerFactory.getLogger(ZNodeOperate.class);

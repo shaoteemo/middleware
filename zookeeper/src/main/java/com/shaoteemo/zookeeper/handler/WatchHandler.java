@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * 所属项目：middleware
- * 所属包：com.shaoteemo.zookeeper.entity
+ * 所属包：com.shaoteemo.zookeeper.handler
  *
  * Zookeeper事件通知处理器
  *

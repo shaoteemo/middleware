@@ -15,7 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class ZookeeperApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ZookeeperApplication.class);
+        SpringApplication.run(ZookeeperApplication.class,args);
     }
 
 }
