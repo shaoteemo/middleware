@@ -57,7 +57,7 @@ public class ZookeeperPracticeApplication {
         Naming.bind(Constants.RMI_NAME_URL, service);
 
         //将url信息存放至zookeeper中
-        this.putMriUrlInfo(RmiMethodService.class.getSimpleName(), Constants.RMI_NAME_URL);
+        this.putRmiUrlInfo(RmiMethodService.class.getSimpleName(), Constants.RMI_NAME_URL);
 
         logger.info("RMI Server启动成功！");
     }
@@ -68,7 +68,7 @@ public class ZookeeperPracticeApplication {
      * @param path 存放路径
      * @param data 存放数据
      */
-    private void putMriUrlInfo(String path, String data) {
+    private void putRmiUrlInfo(String path, String data) {
         path = "/" + path;
         try {
             ZooKeeper zooKeeper = new ZooKeeper(Constants.HOST, Constants.TIME_OUT, new WatchHandler());
