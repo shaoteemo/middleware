@@ -53,7 +53,7 @@ PS scp {file path} {username}@{host}:{remote path}
 使用命令解压`apache-zookeeper-3.7.0-bin.tar.gz`：
 
 ```bash
-bash tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
+$ tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
 ```
 
 #### 2.2单机版（Standalone）
@@ -65,7 +65,7 @@ bash tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
 2. 在`conf`目录中将`zoo_sample.cfg`模板配置文件复制一份为`zoo.cfg`（zookeeper启动默认识别该目录下的配置文件名）。vim编辑`zoo.cfg`配置data目录。
 
    ```bash
-   bash cp zoo_sample.cfg zoo.cfg
+   $ cp zoo_sample.cfg zoo.cfg
    ```
 
    ```properties
@@ -144,13 +144,13 @@ bash tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
    本文使用echo方式分别创建对应文件到data目录中。
 
    ```bash
-   bash echo [内容] >> [路径+文件名]
+   $ echo [内容] >> [路径+文件名]
    ```
 
    示例：
 
    ```bash
-   bash echo 1 >> zookeeper1/data/myid
+   $ echo 1 >> zookeeper1/data/myid
    ```
 
    更多有关CentOS中的命令详解请移步Linux仓库文档。
@@ -198,7 +198,7 @@ bash tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
 根据当前环境在`bin`目录中运行`zkServer.sh`脚本，即可启动zookeeper。
 
 ```bash
-bash ./zkServer.sh [--config <conf-dir>] {start|start-foreground|stop|version|restart|status|print-cmd}
+$ ./zkServer.sh [--config <conf-dir>] {start|start-foreground|stop|version|restart|status|print-cmd}
 ```
 
 参数解释：
@@ -215,7 +215,7 @@ bash ./zkServer.sh [--config <conf-dir>] {start|start-foreground|stop|version|re
 Example1（单机版）：后台启动Zookeeper。
 
 ```bash
-bash ./zkServer.sh start
+$ ./zkServer.sh start
 ```
 
 通过使用`status`参数大致可以得到如下输出：
@@ -230,7 +230,7 @@ output:
 Example2：前台启动制定目录下的zoo.cfg。
 
 ```bash
-bash ./zkServer.sh --config ../conf start-foreground
+$ ./zkServer.sh --config ../conf start-foreground
 ```
 
 Example3（集群版）：与上面例1一样分别启动集群中的Zookeeper实例即可。
@@ -265,13 +265,13 @@ ZooKeeper -server host:port -client-configuration properties-file cmd args
 一般的，直接运行`zkCli`会默认使用 127.0.0.1:2181 端口链接zookeeper服务：
 
 ```bash
-bash ./zkCli.sh
+$ ./zkCli.sh
 ```
 
 对于远程连接zookeeper服务或服务群则需要指定连接参数 `-server host:port`进行连接：
 
 ```bash
-bash ./zkCli.sh -server host:port
+$ ./zkCli.sh -server host:port
 ```
 
 **集群：对于集群使用zkCli连接任意集群中的节点即可**
@@ -281,8 +281,8 @@ bash ./zkCli.sh -server host:port
 Example1：`history`：显示有关您最近执行的 11 个命令的历史记录
 
 ```bash
-bash ./zkCli.sh -server 127.0.0.1:2181
-bash history
+$ ./zkCli.sh -server 127.0.0.1:2181
+[zkShell] history
 ```
 
 ![](http://rep.shaoteemo.com/zkcli_bash_history.png)
@@ -292,7 +292,7 @@ bash history
 Example2：`version`：显示 ZooKeeper 客户端/CLI 的版本
 
 ```bash
-bash ./zkCli.sh version
+$ ./zkCli.sh version
 ```
 
 ![](http://rep.shaoteemo.com/zkcli_bash_version.png)
@@ -346,7 +346,7 @@ ZooKeeper -server host:port -client-configuration properties-file cmd args
 ### 1.`ls`：列出一条路径的子节点。
 
 ```bash
-bash ls [-s] [-w] [-R] path
+[zkShell] ls [-s] [-w] [-R] path
 ```
 
 -s：显示统计状态。
@@ -358,7 +358,7 @@ bash ls [-s] [-w] [-R] path
 Example1：列出root节点下的子节点。
 
 ```bash
-bash ls /
+[zkShell] ls /
 ```
 
 ```
@@ -369,7 +369,7 @@ output:
 ### 2.`create`：创建一个 znode。
 
 ```bash
-bash create [-s] [-e] [-c] [-t ttl] path [data] [acl]
+[zkShell] create [-s] [-e] [-c] [-t ttl] path [data] [acl]
 ```
 
 -s：有顺序的节点。
@@ -389,7 +389,7 @@ data：数据值。
 Example1：创建一个持续节点。
 
 ```bash
-bash create /persistent persistent
+[zkShell] create /persistent persistent
 ```
 
 ```
@@ -400,7 +400,7 @@ output：
 Example2：创建一个持久化顺序节点。
 
 ```bash
-bash create -s /persistent_sequential persistent_sequential
+[zkShell] create -s /persistent_sequential persistent_sequential
 ```
 
 ```
@@ -411,7 +411,7 @@ output:
 Example3：创建一个临时顺序节点。
 
 ```bash
-bash create -e -s /ephemeral_sequential_node ephemeral_sequential
+[zkShell] create -e -s /ephemeral_sequential_node ephemeral_sequential
 ```
 
 ```
@@ -422,7 +422,7 @@ output:
 ### 3.`get`：获取特定路径的数据
 
 ```bash
-bash get [-s] [-w] path
+[zkShell] get [-s] [-w] path
 ```
 
 -s：显示统计信息。
@@ -432,7 +432,7 @@ bash get [-s] [-w] path
 Example1：
 
 ```bash
-bash  get /persistent -s
+[zkShell]  get /persistent -s
 ```
 
 ```
@@ -478,7 +478,7 @@ numChildren:子节点数量
 ### 4.`set`：设置/更新路径上的数据。
 
 ```bash
-bash set [-s] [-v version] path data
+[zkShell] set [-s] [-v version] path data
 ```
 
 -s：显示此节点的状态。
@@ -488,7 +488,7 @@ bash set [-s] [-v version] path data
 Example1：修改 /persistent 节点上的值
 
 ```bash
-bash set /persistent persistent_updata
+[zkShell] set /persistent persistent_updata
 ```
 
 ```
@@ -500,7 +500,7 @@ output:
 ### 5.`delete` ：删除具有特定路径的节点
 
 ```bash
-bash delete [-v version] path
+[zkShell] delete [-v version] path
 ```
 
 Example1：删除/persistent
@@ -681,13 +681,13 @@ zookeeper使用了设计模式中的**观察者模式**。客户端注册监听�
 
 7. 如果您的配置文件已设置，您可以启动 ZooKeeper 服务器：
 
-   ```
+   ```bash
    $ java -cp zookeeper.jar:lib/*:conf org.apache.zookeeper.server.quorum.QuorumPeerMain zoo.conf
    ```
 
 QuorumPeerMain 启动 ZooKeeper 服务器，还注册了[JMX](http://java.sun.com/javase/technologies/core/mntr-mgmt/javamanagement/)管理 bean，允许通过 JMX 管理控制台进行管理。该[ZooKeeper的JMX文件](https://zookeeper.apache.org/doc/r3.7.0/zookeeperJMX.html)包含有关使用JMX管理ZooKeeper的细节。有关启动服务器实例的示例，请参阅发行版中包含的脚本*bin/zkServer.sh*。8. 通过连接主机测试您的部署：在 Java 中，您可以运行以下命令来执行简单的操作：
 
-```
+```bash
     $ bin/zkCli.sh -server 127.0.0.1:2181
 ```
 
