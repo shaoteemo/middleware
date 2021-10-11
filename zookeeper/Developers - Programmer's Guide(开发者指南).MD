@@ -209,7 +209,7 @@ Watches 在客户端连接到 ZooKeeper 服务器后在本地维护。这允许 
 - **Changed event:** 通过调用exists 和getData 启用。
 - **Child event:** 通过调用 getChildren 启用。
 
-## 持久的、递归的Watches
+## 持久、递归的Watches
 
 **3.6.0 中的新功能：**现在在上述标准 watch 上有一个变体，您可以设置一个在触发时不会被移除的 watch 。此外，这些监视会触发事件类型 NodeCreated、NodeDeleted 和 NodeDataChanged，并且可以选择递归地针对所有从监视注册的 znode 开始的 znode 节点。请注意，NodeChildrenChanged 事件不会为持久递归观察触发，因为它是多余的。
 
