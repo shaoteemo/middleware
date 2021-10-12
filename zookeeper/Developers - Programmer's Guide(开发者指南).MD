@@ -217,3 +217,325 @@ Watches 在客户端连接到 ZooKeeper 服务器后在本地维护。这允许 
 
 ## 移除Watches
 
+我们可以通过调用 removeWatches 来删除在 znode 上注册的Watchs。此外，即使没有服务器连接，ZooKeeper 客户端也可以通过将本地标志设置为 true 来删除本地监视。以下列表详细说明了成功移除Watchs后将触发的事件。
+
+- **Child Remove event:** 通过调用 getChildren 添加的 Watcher。
+- **Data Remove event:** 通过调用exists或getData添加的观察者。
+- **Persistent Remove event:** Watcher 是通过调用添加的来添加一个持久的 watch。
+
+## ZooKeeper 对Watches的保障
+
+关于Watches，ZooKeeper 维护这些保障：
+
+- Watches是根据其他事件、其他Watches和异步回复进行排序的。 ZooKeeper 客户端库确保按顺序分派所有内容。
+- 在监听到对应于该 znode 的新数据之前，客户端将看到它正在监视的 znode 的事件。
+- 来自 ZooKeeper 的观察事件的顺序对应于 ZooKeeper 服务所看到的更新顺序。
+
+## 关于Watches的注意事项
+
+- 标准Watches是一次性触发器；如果您收到一个 watch 事件，并且希望收到有关未来更改的通知，则必须设置另一个 watch。
+- 因为标准Watches是一次性触发器，并且在获取事件和发送新请求以获取Watches之间存在延迟，所以您无法可靠地看到 ZooKeeper 中节点发生的每一个变化。准备好处理 znode 在获取事件和再次设置 watch 之间多次更改的情况。 （你可能不在乎，但至少意识到它可能会发生。）
+- 一个监视对象，或 函数/上下文对 ，对于给定的通知只会被触发一次。例如，如果为同一个文件注册了同一个监视对象，并且为同一个文件调用了 getData，然后删除了该文件，则该监视对象将仅被调用一次，并带有该文件的删除通知。
+- 当您与服务器断开连接时（例如，当服务器出现故障时），在重新建立连接之前您将不会获得任何监视。出于这个原因，会话事件被发送到所有未完成的监视处理程序。使用会话事件进入安全模式：断开连接时您不会接收事件，因此您的进程应该在该模式下保守地运行。
+
+# ZooKeeper 访问控制使用 ACL 
+
+ZooKeeper 使用 ACL 来控制对其 znode（ZooKeeper 数据树的数据节点）的访问。ACL 实现与 UNIX 文件访问权限非常相似：它使用权限来允许/禁止针对节点的各种操作以及这些权限适用的范围。与标准 UNIX 权限不同，ZooKeeper 节点不受用户（文件所有者）、组和全局（其他）三个标准范围的限制。 ZooKeeper 没有 znode 所有者的概念。相反，ACL 指定了与这些 id 相关联的 id 和权限集。
+
+另请注意，ACL 仅适用于特定的 znode。尤其不适用于子节点。例如，如果 /app 只能被 ip:172.16.16.1 读取，而 /app/status 是全局可读的，那么任何人都可以读取 /app/status； ACL 不是递归的。
+
+ZooKeeper 支持可插入的身份验证方案。Id 使用形式 scheme:expression 指定，其中 scheme 是 id 对应的身份验证方案。有效表达式集由方案定义。例如，ip:172.16.16.1 是使用 ip 方案的地址为 172.16.16.1 的主机的 ID，而digest:bob:password 是使用摘要方案的名称为 bob 的用户的 ID。
+
+当客户端连接到 ZooKeeper 并对其进行身份验证时，ZooKeeper 将与客户端对应的所有 id 与客户端连接相关联。当客户端尝试访问节点时，会根据 znode 的 ACL 检查这些 id。 ACL 由成对的 (scheme:expression, perms) 组成。表达式的格式特定于方案。例如，对 向 IP (ip:19.22.0.0/16, READ) 地址以 19.22 开头的任何客户端授予 READ 权限。
+
+## ACL 权限
+
+ZooKeeper 支持以下权限：
+
+- **CREATE**: 允许创建一个子节点
+- **READ**: 允许从节点获取数据并列出其子节点。
+- **WRITE**: 允许为节点设置数据
+- **DELETE**: 允许删除一个子节点
+- **ADMIN**: 允许设置权限
+
+CREATE 和 DELETE 权限已脱离 WRITE 权限，以实现更细粒度的访问控制。 CREATE 和 DELETE 的情况如下：
+
+您希望 A 能够在 ZooKeeper 节点上执行设置，但不能*创建*或*删除*子节点。
+
+CREATE without DELETE：客户端通过在父目录中创建 ZooKeeper 节点来创建请求。您希望所有客户端都可以添加，但只有请求处理器可以删除。 （这有点像文件的 APPEND 权限。）
+
+此外，还有 ADMIN 权限，因为 ZooKeeper 没有文件所有者的概念。在某种意义上，ADMIN 权限将实体指定为所有者。 ZooKeeper 不支持 LOOKUP 权限（对目录执行权限以允许您LOOKUP，即使您无法列出目录）。每个人都隐含地拥有 LOOKUP 权限。这允许您统计一个节点，但仅此而已。 （问题是，如果你想在一个不存在的节点上调用 zoo_exists() ，则没有权限检查。）
+
+ADMIN 权限在 ACL 方面也有特殊作用：为了检索 znode 用户的 ACL，必须具有 READ 或 ADMIN 权限，但没有 ADMIN 权限，摘要哈希值将被屏蔽。
+
+### 内置 ACL 方案
+
+ZooKeeper 有以下内置方案：
+
+- **world** 有一个 id，代表任何人。
+- **auth** 是一种特殊方案，它忽略任何提供的表达式，而是使用当前用户、凭据和方案。在保留 ACL 时，ZooKeeper 服务器将忽略提供的任何表达式（无论是用户是 SASL 身份验证还是 user:password 以 DIGEST 身份验证）。但是，表达式仍必须在 ACL 中提供，因为 ACL 必须与格式 scheme:expression:perms 匹配。提供此方案是为了方便，因为它是用户创建 znode 并将对该 znode 的访问权限限制为仅该用户的常见用例。如果没有经过身份验证的用户，则使用 auth 方案设置 ACL 将失败。
+- **digest** 使用 username:password 字符串生成 MD5 哈希，然后将其用作于 ACL ID 身份。身份验证是通过以明文形式发送用户名：密码来完成的。在 ACL 中使用时，表达式将是 username:base64 编码的 SHA1 密码摘要。
+- **ip** 使用客户端主机 IP 作为 ACL ID 身份。 ACL 表达式的格式为 addr/bits，其中 addr 的最高有效位与客户端主机 IP 的最高有效位相匹配。
+- **x509** 使用客户端 X500 Principal 作为 ACL ID 身份。 ACL 表达式是客户端的准确 X500 主体名称。使用安全端口时，客户端会自动进行身份验证并设置其 x509 方案的身份验证信息。
+
+### ZooKeeper C 客户端 API
+
+本节略：http://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html#ZooKeeper+C+client+API
+
+# 可插入的 ZooKeeper 身份验证
+
+ZooKeeper 运行在各种不同的环境中，具有各种不同的身份验证方案，因此它具有完全可插拔的身份验证框架。甚至内置的身份验证方案也使用可插入的身份验证框架。
+
+要了解身份验证框架的工作原理，首先必须了解两个主要的身份验证操作。框架首先必须对客户端进行身份验证。这通常在客户端连接到服务器后立即完成，包括验证从客户端发送或收集的有关客户端的信息并将其与连接相关联。框架处理的第二个操作是在 ACL 中查找对应于客户端的条目。 ACL 条目是 <idspec, permissions> 对。 idspec 可以是与连接关联的身份验证信息匹配的简单字符串，也可以是针对该信息进行评估的表达式。由身份验证插件的实现来进行匹配。这是身份验证插件必须实现的接口：
+
+```java
+public interface AuthenticationProvider {
+    String getScheme();
+    KeeperException.Code handleAuthentication(ServerCnxn cnxn, byte authData[]);
+    boolean isValid(String id);
+    boolean matches(String id, String aclExpr);
+    boolean isAuthenticated();
+}
+```
+
+第一个方法 getScheme 返回插件标识的字符串。由于我们支持多种身份验证方法，因此身份验证凭据或 idspec 将始终以 scheme: 为前缀。 ZooKeeper 服务器使用身份验证插件返回的方案来确定该方案适用于哪些 id。
+
+当客户端发送与连接相关联的身份验证信息时，将调用 handleAuthentication。客户端指定信息对应的方案。 ZooKeeper 服务器将信息传递给身份验证插件，其 getScheme 与客户端传递的方案相匹配。 handleAuthentication 的实现者通常会在确定信息错误时返回错误，或者使用 cnxn.getAuthInfo().add(new Id(getScheme(), data)) 将信息与连接相关联。
+
+身份验证插件涉及设置和使用 ACL。当为 znode 设置 ACL 时，ZooKeeper 服务器会将条目的 id 部分传递给 isValid(String id) 方法。由插件来验证 id 是否具有正确的形式。例如，ip:172.16.0.0/16 是一个有效的 id，但 ip:host.com 不是。如果新的 ACL 包含“auth”条目，则使用 isAuthenticated 来查看是否应将与连接关联的此方案的身份验证信息添加到 ACL 中。某些方案不应包含在 auth.例如，如果指定了 auth，则客户端的 IP 地址不被视为应添加到 ACL 的 id。
+
+ZooKeeper 在检查 ACL 时调用matches(String id, String aclExpr)。它需要将客户端的认证信息与相关的 ACL 条目进行匹配。为了找到适用于客户端的条目，ZooKeeper 服务器将找到每个条目的方案，如果该方案有来自该客户端的身份验证信息，则将调用matches(String id, String aclExpr) 并将 id 设置为身份验证先前由 handleAuthentication 添加到连接的信息，并将 aclExpr 设置为 ACL 条目的 id。身份验证插件使用自己的逻辑和匹配方案来确定 id 是否包含在 aclExpr 中。
+
+有两个内置的身份验证插件：ip 和digest。可以使用系统属性添加其他插件。在启动时，ZooKeeper 服务器将查找以“zookeeper.authProvider”开头的系统属性。并将这些属性的值解释为身份验证插件的类名。可以使用 -Dzookeeeper.authProvider.X=com.f.MyAuth 或在服务器配置文件中添加如下条目来设置这些属性：
+
+```properties
+authProvider.1=com.f.MyAuth
+authProvider.2=com.f.MyAuth2
+```
+
+应注意确保属性上的后缀是唯一的。如果有 -Dzookeeeper.authProvider.X=com.f.MyAuth -Dzookeeper.authProvider.X=com.f.MyAuth2 等重复项，则只会使用一个。此外，所有服务器都必须定义相同的插件，否则使用插件提供的身份验证方案的客户端将无法连接到某些服务器。
+
+**在 3.6.0 中添加：**替代抽象可用于可插拔身份验证。它提供了额外的参数。
+
+```java
+public abstract class ServerAuthenticationProvider implements AuthenticationProvider {
+    public abstract KeeperException.Code handleAuthentication(ServerObjs serverObjs, byte authData[]);
+    public abstract boolean matches(ServerObjs serverObjs, MatchValues matchValues);
+}
+```
+
+不是实现 AuthenticationProvider，而是扩展 ServerAuthenticationProvider。然后您的 handleAuthentication() 和matches() 方法将接收额外的参数（通过ServerObjs 和MatchValues）。
+
+- **ZooKeeperServer** ZooKeeperServer 实例
+- **ServerCnxn** 当前连接
+- **path** 正在操作的 ZNode 路径（如果未使用，则为 null）
+- **perm** 操作值或0
+- **setAcls** 当 setAcl() 方法被操作时，正在设置的 ACL 列表
+
+# 一致性保证
+
+ZooKeeper 是一种高性能、可扩展的服务。读取和写入操作都设计得很快，尽管读取比写入快。这样做的原因是在读取的情况下，ZooKeeper 可以为较旧的数据提供服务，而这又是由于 ZooKeeper 的一致性保证：
+
+- **顺序一致性：**来自客户端的更新将按照发送的顺序应用。
+- **原子性：**更新要么成功要么失败——没有部分结果。
+- **单一系统映像：**客户端将看到相同的最新服务视图，无论它连接到哪个服务器。即使客户端故障转移到具有相同会话的不同服务器，客户端也永远不会看到系统的旧视图。
+- **可靠性：**一旦应用更新，它将从那一刻起持续存在，直到客户端覆盖更新。这个保证有两个推论：
+  1. 如果客户端获得成功的返回码，则更新将被应用。在某些失败（通信错误、超时等）时，客户端将不知道更新是否已应用。我们采取措施尽量减少失败，但保证只存在于成功的返回代码中。 （这在 Paxos 中称为单调性条件。）
+  2. 从服务器故障中恢复时，客户端通过读取请求或成功更新看到的任何更新数据将永远不会回滚。
+- **及时性：** 系统的客户端视图保证在一定的时间范围内（大约几十秒）是最新的。在此范围内的客户端将看到系统更改，或者客户端将检测到服务中断。
+
+使用这些一致性保证可以很容易地构建更高级别的功能，例如领导者选举、屏障（barriers）、队列和仅在 ZooKeeper 客户端上的 读/写 可撤销锁（无需添加到 ZooKeeper）。有关更多详细信息，请参阅[Recipes and Solutions](http://zookeeper.apache.org/doc/r3.7.0/recipes.html)。
+
+> 有时，开发人员错误地假设了 ZooKeeper 实际上没有提供的另一种保证。如： “同时一致的跨客户端视图”：ZooKeeper 不保证在每个时间实例中，两个不同的客户端将具有相同的 ZooKeeper 数据视图。由于网络延迟等因素，一个客户端可能会在另一个客户端收到更改通知之前执行更新。考虑两个客户端A和B的场景，如果客户端A将一个znode /a的值从0设置为1，然后告诉客户端B读取/a，客户端B可能会读取旧值0，具体取决于哪个服务器它连接到。如果客户端 A 和客户端 B 读取相同的值很重要，客户端 B 应该在执行读取之前从 ZooKeeper API 方法调用 sync() 方法。因此，ZooKeeper 本身并不能保证所有服务器同步发生更改，但 ZooKeeper 原语可用于构建提供有用客户端同步的更高级别的函数。 （有关更多信息，请参阅 [ZooKeeper Recipes](http://zookeeper.apache.org/doc/r3.7.0/recipes.html)）。
+
+# 绑定
+
+本节略：http://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html#ch_bindings
+
+The ZooKeeper client libraries come in two languages: Java and C. The following sections describe these.
+
+## Java Binding
+
+There are two packages that make up the ZooKeeper Java binding: **org.apache.zookeeper** and **org.apache.zookeeper.data**. The rest of the packages that make up ZooKeeper are used internally or are part of the server implementation. The **org.apache.zookeeper.data** package is made up of generated classes that are used simply as containers.
+
+The main class used by a ZooKeeper Java client is the **ZooKeeper** class. Its two constructors differ only by an optional session id and password. ZooKeeper supports session recovery across instances of a process. A Java program may save its session id and password to stable storage, restart, and recover the session that was used by the earlier instance of the program.
+
+When a ZooKeeper object is created, two threads are created as well: an IO thread and an event thread. All IO happens on the IO thread (using Java NIO). All event callbacks happen on the event thread. Session maintenance such as reconnecting to ZooKeeper servers and maintaining heartbeat is done on the IO thread. Responses for synchronous methods are also processed in the IO thread. All responses to asynchronous methods and watch events are processed on the event thread. There are a few things to notice that result from this design:
+
+- All completions for asynchronous calls and watcher callbacks will be made in order, one at a time. The caller can do any processing they wish, but no other callbacks will be processed during that time.
+- Callbacks do not block the processing of the IO thread or the processing of the synchronous calls.
+- Synchronous calls may not return in the correct order. For example, assume a client does the following processing: issues an asynchronous read of node **/a** with *watch* set to true, and then in the completion callback of the read it does a synchronous read of **/a**. (Maybe not good practice, but not illegal either, and it makes for a simple example.) Note that if there is a change to **/a** between the asynchronous read and the synchronous read, the client library will receive the watch event saying **/a** changed before the response for the synchronous read, but because of the completion callback blocking the event queue, the synchronous read will return with the new value of **/a** before the watch event is processed.
+
+Finally, the rules associated with shutdown are straightforward: once a ZooKeeper object is closed or receives a fatal event (SESSION_EXPIRED and AUTH_FAILED), the ZooKeeper object becomes invalid. On a close, the two threads shut down and any further access on zookeeper handle is undefined behavior and should be avoided.
+
+### Client Configuration Parameters
+
+The following list contains configuration properties for the Java client. You can set any of these properties using Java system properties. For server properties, please check the [Server configuration section of the Admin Guide](http://zookeeper.apache.org/doc/r3.7.0/zookeeperAdmin.html#sc_configuration). The ZooKeeper Wiki also has useful pages about [ZooKeeper SSL support](https://cwiki.apache.org/confluence/display/ZOOKEEPER/ZooKeeper+SSL+User+Guide), and [SASL authentication for ZooKeeper](https://cwiki.apache.org/confluence/display/ZOOKEEPER/ZooKeeper+and+SASL).
+
+- *zookeeper.sasl.client* : Set the value to **false** to disable SASL authentication. Default is **true**.
+- *zookeeper.sasl.clientconfig* : Specifies the context key in the JAAS login file. Default is "Client".
+- *zookeeper.server.principal* : Specifies the server principal to be used by the client for authentication, while connecting to the zookeeper server, when Kerberos authentication is enabled. If this configuration is provided, then the ZooKeeper client will NOT USE any of the following parameters to determine the server principal: zookeeper.sasl.client.username, zookeeper.sasl.client.canonicalize.hostname, zookeeper.server.realm Note: this config parameter is working only for ZooKeeper 3.5.7+, 3.6.0+
+- *zookeeper.sasl.client.username* : Traditionally, a principal is divided into three parts: the primary, the instance, and the realm. The format of a typical Kerberos V5 principal is primary/instance@REALM. zookeeper.sasl.client.username specifies the primary part of the server principal. Default is "zookeeper". Instance part is derived from the server IP. Finally server's principal is username/IP@realm, where username is the value of zookeeper.sasl.client.username, IP is the server IP, and realm is the value of zookeeper.server.realm.
+- *zookeeper.sasl.client.canonicalize.hostname* : Expecting the zookeeper.server.principal parameter is not provided, the ZooKeeper client will try to determine the 'instance' (host) part of the ZooKeeper server principal. First it takes the hostname provided as the ZooKeeper server connection string. Then it tries to 'canonicalize' the address by getting the fully qualified domain name belonging to the address. You can disable this 'canonicalization' by setting: zookeeper.sasl.client.canonicalize.hostname=false
+- *zookeeper.server.realm* : Realm part of the server principal. By default it is the client principal realm.
+- *zookeeper.disableAutoWatchReset* : This switch controls whether automatic watch resetting is enabled. Clients automatically reset watches during session reconnect by default, this option allows the client to turn off this behavior by setting zookeeper.disableAutoWatchReset to **true**.
+- *zookeeper.client.secure* : **New in 3.5.5:** If you want to connect to the server secure client port, you need to set this property to **true** on the client. This will connect to server using SSL with specified credentials. Note that it requires the Netty client.
+- *zookeeper.clientCnxnSocket* : Specifies which ClientCnxnSocket to be used. Possible values are **org.apache.zookeeper.ClientCnxnSocketNIO** and **org.apache.zookeeper.ClientCnxnSocketNetty** . Default is **org.apache.zookeeper.ClientCnxnSocketNIO** . If you want to connect to server's secure client port, you need to set this property to **org.apache.zookeeper.ClientCnxnSocketNetty** on client.
+- *zookeeper.ssl.keyStore.location and zookeeper.ssl.keyStore.password* : **New in 3.5.5:** Specifies the file path to a JKS containing the local credentials to be used for SSL connections, and the password to unlock the file.
+- *zookeeper.ssl.trustStore.location and zookeeper.ssl.trustStore.password* : **New in 3.5.5:** Specifies the file path to a JKS containing the remote credentials to be used for SSL connections, and the password to unlock the file.
+- *zookeeper.ssl.keyStore.type* and *zookeeper.ssl.trustStore.type*: **New in 3.5.5:** Specifies the file format of keys/trust store files used to establish TLS connection to the ZooKeeper server. Values: JKS, PEM, PKCS12 or null (detect by filename). Default: null. **New in 3.6.3, 3.7.0:** The format BCFKS was added.
+- *jute.maxbuffer* : In the client side, it specifies the maximum size of the incoming data from the server. The default is 0xfffff(1048575) bytes, or just under 1M. This is really a sanity check. The ZooKeeper server is designed to store and send data on the order of kilobytes. If incoming data length is more than this value, an IOException is raised. This value of client side should keep same with the server side(Setting **System.setProperty("jute.maxbuffer", "xxxx")** in the client side will work), otherwise problems will arise.
+- *zookeeper.kinit* : Specifies path to kinit binary. Default is "/usr/bin/kinit".
+
+## C Binding
+
+The C binding has a single-threaded and multi-threaded library. The multi-threaded library is easiest to use and is most similar to the Java API. This library will create an IO thread and an event dispatch thread for handling connection maintenance and callbacks. The single-threaded library allows ZooKeeper to be used in event driven applications by exposing the event loop used in the multi-threaded library.
+
+The package includes two shared libraries: zookeeper_st and zookeeper_mt. The former only provides the asynchronous APIs and callbacks for integrating into the application's event loop. The only reason this library exists is to support the platforms were a *pthread* library is not available or is unstable (i.e. FreeBSD 4.x). In all other cases, application developers should link with zookeeper_mt, as it includes support for both Sync and Async API.
+
+### Installation
+
+If you're building the client from a check-out from the Apache repository, follow the steps outlined below. If you're building from a project source package downloaded from apache, skip to step **3**.
+
+1. Run `ant compile_jute` from the ZooKeeper top level directory (*.../trunk*). This will create a directory named "generated" under *.../trunk/zookeeper-client/zookeeper-client-c*.
+2. Change directory to the*.../trunk/zookeeper-client/zookeeper-client-c* and run `autoreconf -if` to bootstrap **autoconf**, **automake** and **libtool**. Make sure you have **autoconf version 2.59** or greater installed. Skip to step**4**.
+3. If you are building from a project source package, unzip/untar the source tarball and cd to the* zookeeper-x.x.x/zookeeper-client/zookeeper-client-c* directory.
+4. Run `./configure <your-options>` to generate the makefile. Here are some of options the **configure** utility supports that can be useful in this step:
+
+- `--enable-debug` Enables optimization and enables debug info compiler options. (Disabled by default.)
+- `--without-syncapi` Disables Sync API support; zookeeper_mt library won't be built. (Enabled by default.)
+- `--disable-static` Do not build static libraries. (Enabled by default.)
+- `--disable-shared` Do not build shared libraries. (Enabled by default.)
+
+#### Note
+
+> See INSTALL for general information about running **configure**. 1. Run `make` or `make install` to build the libraries and install them. 1. To generate doxygen documentation for the ZooKeeper API, run `make doxygen-doc`. All documentation will be placed in a new subfolder named docs. By default, this command only generates HTML. For information on other document formats, run `./configure --help`
+
+### Building Your Own C Client
+
+In order to be able to use the ZooKeeper C API in your application you have to remember to
+
+1. Include ZooKeeper header: `#include <zookeeper/zookeeper.h>`
+2. If you are building a multithreaded client, compile with `-DTHREADED` compiler flag to enable the multi-threaded version of the library, and then link against the *zookeeper_mt* library. If you are building a single-threaded client, do not compile with `-DTHREADED`, and be sure to link against the_zookeeper_st_library.
+
+#### Note
+
+> See *.../trunk/zookeeper-client/zookeeper-client-c/src/cli.c* for an example of a C client implementation
+
+# 构建块：ZooKeeper 操作指南
+
+本节略：http://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html#ch_guideToZkOperations
+
+## Building Blocks: A Guide to ZooKeeper Operations
+
+This section surveys all the operations a developer can perform against a ZooKeeper server. It is lower level information than the earlier concepts chapters in this manual, but higher level than the ZooKeeper API Reference. It covers these topics:
+
+- [Connecting to ZooKeeper](http://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html#sc_connectingToZk)
+
+### Handling Errors
+
+Both the Java and C client bindings may report errors. The Java client binding does so by throwing KeeperException, calling code() on the exception will return the specific error code. The C client binding returns an error code as defined in the enum ZOO_ERRORS. API callbacks indicate result code for both language bindings. See the API documentation (javadoc for Java, doxygen for C) for full details on the possible errors and their meaning.
+
+### Connecting to ZooKeeper
+
+Before we begin, you will have to set up a running Zookeeper server so that we can start developing the client. For C client bindings, we will be using the multithreaded library(zookeeper_mt) with a simple example written in C. To establish a connection with Zookeeper server, we make use of C API - *zookeeper_init* with the following signature:
+
+```c
+int zookeeper_init(const char *host, watcher_fn fn, int recv_timeout, const clientid_t *clientid, void *context, int flags);
+```
+
+- **host* : Connection string to zookeeper server in the format of host:port. If there are multiple servers, use comma as separator after specifying the host:port pairs. Eg: "127.0.0.1:2181,127.0.0.1:3001,127.0.0.1:3002"
+- *fn* : Watcher function to process events when a notification is triggered.
+- *recv_timeout* : Session expiration time in milliseconds.
+- **clientid* : We can specify 0 for a new session. If a session has already establish previously, we could provide that client ID and it would reconnect to that previous session.
+- **context* : Context object that can be associated with the zkhandle_t handler. If it is not used, we can set it to 0.
+- *flags* : In an initiation, we can leave it for 0.
+
+We will demonstrate client that outputs "Connected to Zookeeper" after successful connection or an error message otherwise. Let's call the following code *zkClient.cc* :
+
+```c
+#include <stdio.h>
+#include <zookeeper/zookeeper.h>
+#include <errno.h>
+using namespace std;
+
+// Keeping track of the connection state
+static int connected = 0;
+static int expired   = 0;
+
+// *zkHandler handles the connection with Zookeeper
+static zhandle_t *zkHandler;
+
+// watcher function would process events
+void watcher(zhandle_t *zkH, int type, int state, const char *path, void *watcherCtx)
+{
+    if (type == ZOO_SESSION_EVENT) {
+
+        // state refers to states of zookeeper connection.
+        // To keep it simple, we would demonstrate these 3: ZOO_EXPIRED_SESSION_STATE, ZOO_CONNECTED_STATE, ZOO_NOTCONNECTED_STATE
+        // If you are using ACL, you should be aware of an authentication failure state - ZOO_AUTH_FAILED_STATE
+        if (state == ZOO_CONNECTED_STATE) {
+            connected = 1;
+        } else if (state == ZOO_NOTCONNECTED_STATE ) {
+            connected = 0;
+        } else if (state == ZOO_EXPIRED_SESSION_STATE) {
+            expired = 1;
+            connected = 0;
+            zookeeper_close(zkH);
+        }
+    }
+}
+
+int main(){
+    zoo_set_debug_level(ZOO_LOG_LEVEL_DEBUG);
+
+    // zookeeper_init returns the handler upon a successful connection, null otherwise
+    zkHandler = zookeeper_init("localhost:2181", watcher, 10000, 0, 0, 0);
+
+    if (!zkHandler) {
+        return errno;
+    }else{
+        printf("Connection established with Zookeeper. \n");
+    }
+
+    // Close Zookeeper connection
+    zookeeper_close(zkHandler);
+
+    return 0;
+}
+```
+
+Compile the code with the multithreaded library mentioned before.
+
+```
+> g++ -Iinclude/ zkClient.cpp -lzookeeper_mt -o Client
+```
+
+Run the client.
+
+```
+> ./Client
+```
+
+From the output, you should see "Connected to Zookeeper" along with Zookeeper's DEBUG messages if the connection is successful.
+
+# 常见问题和故障排除
+
+现在你知道了 ZooKeeper。它快速、简单，您的应用程序可以运行，但是等等……出了点问题。以下是 ZooKeeper 用户陷入的一些陷阱：
+
+1. 如果您使用watches，则必须查找已连接的 watch 事件。 当 ZooKeeper 客户端与服务器断开连接时，在重新连接之前您不会收到更改通知。如果您正在观察 znode 是否存在，如果在您断开连接时创建和删除 znode，您将错过该事件。
+2. 您必须测试 ZooKeeper 服务器故障。只要大多数服务器处于活动状态，ZooKeeper 服务就可以在出现故障时幸免于难。 要问的问题是：您的应用程序可以处理吗？在现实世界中，客户端与 ZooKeeper 的连接可能会中断。 （ZooKeeper 服务器故障和网络断开是连接丢失的常见原因。）ZooKeeper 客户端库负责恢复您的连接并让您知道发生了什么，但您必须确保恢复您的状态和任何未完成的失败请求。 看看你是否在测试实验室中做对了，而不是在生产中 - 使用由多个服务器组成的 ZooKeeper 服务进行测试，并使它们重新启动。
+3. 客户端使用的 ZooKeeper 服务器列表必须与每个 ZooKeeper 服务器拥有的 ZooKeeper 服务器列表相匹配。如果客户端列表是 ZooKeeper 服务器真实列表的一个子集，那么可以工作，尽管不是最佳状态，但如果客户端列出不在 ZooKeeper 集群中的 ZooKeeper 服务器，则可能不会正常工作。
+4. 请小心放置事务日志的位置。ZooKeeper 对性能最关键的部分是事务日志。ZooKeeper 必须在返回响应之前将事务同步到日志文件。专用的事务日志设备是保持良好性能的关键。将日志放在繁忙的设备上会对性能产生不利影响。如果你只有一个存储设备，把跟踪文件放在NFS上并增加snapshotCount；它不能消除问题，但可以减轻负担。
+5. 正确设置您的 Java 最大堆大小。避免交换非常重要。不必要地访问磁盘几乎肯定会降低您的性能，令人无法接受。请记住，在 ZooKeeper 中，一切都是有序的，因此如果一个请求访问磁盘数据，则所有其他排队的请求都会访问磁盘数据。为避免交换，请尝试将堆大小设置为您拥有的物理内存量减去操作系统和缓存所需的量。为您的配置确定最佳堆大小的最佳方法是运行负载测试。如果由于某种原因您不能进行测试，请保守估计并选择一个远低于会导致您的机器交换的限制的数字。例如，在 4G 机器上，3G 堆是一个保守的估计。
+
+## Links to Other Information
+
+Outside the formal documentation, there're several other sources of information for ZooKeeper developers.
+
+- *[API Reference](https://zookeeper.apache.org/doc/current/apidocs/zookeeper-server/index.html)* : The complete reference to the ZooKeeper API
+- *[ZooKeeper Talk at the Hadoop Summit 2008](https://www.youtube.com/watch?v=rXI9xiesUV8)* : A video introduction to ZooKeeper, by Benjamin Reed of Yahoo! Research
+- *[Barrier and Queue Tutorial](https://cwiki.apache.org/confluence/display/ZOOKEEPER/Tutorial)* : The excellent Java tutorial by Flavio Junqueira, implementing simple barriers and producer-consumer queues using ZooKeeper.
+- *[ZooKeeper - A Reliable, Scalable Distributed Coordination System](https://cwiki.apache.org/confluence/display/ZOOKEEPER/ZooKeeperArticles)* : An article by Todd Hoff (07/15/2008)
+- *[ZooKeeper Recipes](http://zookeeper.apache.org/doc/r3.7.0/recipes.html)* : Pseudo-level discussion of the implementation of various synchronization solutions with ZooKeeper: Event Handles, Queues, Locks, and Two-phase Commits.
+
