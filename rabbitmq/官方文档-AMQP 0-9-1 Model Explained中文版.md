@@ -128,7 +128,7 @@ AMQP 0-9-1 是一种可编程协议，因为 AMQP 0-9-1 实体和路由方案主
 AMQP 0-9-1 模型中的队列（[Queues](https://www.rabbitmq.com/queues.html)）与其他消息和任务队列系统中的队列非常相似：它们存储应用程序使用的消息。队列与交换器共享一些属性，但也有一些额外的属性：
 
 - Name
-- Durable (the queue will survive a broker restart（持久化）)
+- Durable (队列将在服务器重启后继续存在（持久性）)
 - Exclusive (仅由一个连接使用，当该连接关闭时队列将被删除)
 - Auto-delete (当最后一个消费者取消订阅时，删除至少有一个消费者的队列)
 - Arguments (可选的;由插件和特定于broker的功能使用，例如消息 TTL、队列长度限制等)

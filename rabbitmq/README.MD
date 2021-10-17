@@ -104,6 +104,8 @@ $ yum -y install make gcc gcc-c++ kernel-devel m4 ncurses-devel openssl-devel un
 
 ### 1.AMQP 0-9-1 模型解释：见《官方文档-AMQP 0-9-1 Model Explained中文版》
 
+### 2.队列指南（Queues guide）：见《官方文档-Queue and Consumer Features中文版》
+
 ### 
 
 ## 扩展知识
