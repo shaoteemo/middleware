@@ -1,6 +1,6 @@
 本文档翻译官方文档：http://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html
 
-<h1>ZooKeeper 程序员指南</h1>
+<h1>ZooKeeper 程序员指南-官方中文版</h1>
 
 <h2>开发使用 ZooKeeper 的分布式应用程序</h2>
 
