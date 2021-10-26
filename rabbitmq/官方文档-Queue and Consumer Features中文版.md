@@ -240,6 +240,247 @@ RabbitMQ 收集有关队列的多个指标。它们中的大部分都可以通�
 
 ## 消费者指南（Consumers guide）
 
+### Consumers
+
+### 概述
+
+本指南涵盖了与消费者相关的各种主题：
+
+- 基础知识
+- 消费者生命周期
+- 如何注册消费者（订阅，“push API”）
+- 确认模式
+- 消息属性和传递元数据
+- 如何使用预取限制未完成交付的数量
+- 送达确认超时
+- 消费者容量指标
+- 如何取消消费者
+- 消费者专有权
+- 单一活跃消费者
+- 消费者活动
+- 消费者优先级
+- 连接故障恢复
+- 异常处理
+- 并发考虑
+
+及更多。
+
+### 术语
+
+术语“消费者”在不同的上下文中意味着不同的事物。一般来说，在消息传递中，消费者是消费消息的应用程序（或应用程序实例）。 同一个应用程序还可以发布消息，从而同时成为发布者。
+
+消息传递协议还具有持久订阅消息传递的概念。订阅是通常用于描述此类实体的一个术语。 消费者是另一个。 RabbitMQ 支持的消息传递协议使用这两个术语，但 RabbitMQ 文档倾向于使用后者。
+
+从这个意义上说，消费者是消息传递的订阅，必须在传递开始之前注册并且可以被应用程序取消。
+
+### 基础知识
+
+RabbitMQ 是一个消息代理（broker。服务器）。 它接受来自发布者的消息并路由它们，如果有队列路由到，存储它们以供消费或立即交付给消费者（如果有的话）。
+
+消费者从队列中消费。 为了消费消息，必须有一个队列。 当添加一个新的消费者时，假设队列中已经有消息准备好，交付将立即开始。
+
+消费者注册时，目标队列可以为空。 在这种情况下，当新消息入队时，将发生第一次交付。
+
+尝试从不存在的队列中消费将导致通道级异常，代码为`404 Not Found`并呈现它试图关闭的通道。
+
+#### 消费者标签
+
+每个使用者都有一个标识符，客户端库使用该标识符来确定要为给定交付调用哪个处理程序。它们的名称因协议而异。消费者标签和订阅 ID 是两个最常用的术语。 RabbitMQ 文档倾向于使用前者。
+
+消费者标签也用于取消消费者。
+
+#### 消费者生命周期
+
+消费者应该是长期存在的：也就是说，在消费者的整个生命周期中，它都会收到多次交付。注册消费者以消费单个消息并不是最佳选择。
+
+消费者通常在应用程序启动期间注册。只要他们的连接，甚至应用程序运行，他们通常就可以运行。
+
+消费者可以更加动态地注册以响应系统事件，不再需要时取消订阅。这在通过 [Web STOMP](https://www.rabbitmq.com/web-stomp.html) 和 [Web MQTT](https://www.rabbitmq.com/web-mqtt.html) 插件、移动客户端等使用的 WebSocket 客户端中很常见。
+
+#### 连接恢复
+
+客户端可能会失去与 RabbitMQ 的连接。当检测到连接丢失时，消息传递停止。
+
+一些客户端库提供涉及消费者恢复的自动连接恢复功能。[Java](https://www.rabbitmq.com/api-guide.html#recovery)、[.NET](https://www.rabbitmq.com/dotnet-api-guide.html#recovery)和[Bunny](http://rubybunny.info/articles/error_handling.html)是此类库的示例。虽然连接恢复不能覆盖 100% 的场景和工作负载，但它通常适用于消费应用程序，建议使用。
+
+对于其他客户端库，应用程序开发人员负责执行连接恢复。通常以下恢复顺序效果很好：
+
+- 恢复连接
+- 恢复通道
+- 恢复队列
+- 恢复交换器
+- 恢复绑定
+- 恢复消费者
+
+换句话说，消费者通常最后恢复，在他们的目标队列和那些队列的绑定到位之后。
+
+### 注册消费者（订阅，“push API”）
+
+RabbitMQ 可以向订阅应用程序推送入队消息（传递）。这是通过在队列上注册消费者（订阅）来完成的。完成订阅后，RabbitMQ 将开始传递消息。对于每次交付，将调用用户提供的处理程序。根据所使用的客户端库，这可以是用户提供的函数或符合特定接口的对象。
+
+成功的订阅操作会返回订阅标识符（消费者标签）。它可以稍后用于取消消费者（即取消订阅）。
+
+#### **Java Client**
+
+查看 [Java client guide](https://www.rabbitmq.com/api-guide.html#consuming) 示例。
+
+#### **.NET Client**
+
+查看 [.NET client guide](https://www.rabbitmq.com/dotnet-api-guide.html#consuming) 示例。
+
+#### 消息属性和传递元数据
+
+每次传递都结合了消息元数据和传递信息。不同的客户端库使用稍微不同的方式来提供对这些属性的访问。通常，交付处理程序可以访问交付数据结构。
+
+以下属性是交付和路由详细信息；它们本身不是消息属性，而是由 RabbitMQ 在路由和交付时设置的：
+
+| 属性         | 类型             | 描述                                                         |
+| ------------ | ---------------- | ------------------------------------------------------------ |
+| Delivery tag | Positive integer | 交付标识符，见 [Confirms](https://www.rabbitmq.com/confirms.html). |
+| Redelivered  | Boolean          | 如果此消息先前[已传递并重新排队](https://www.rabbitmq.com/confirms.html#consumer-nacks-requeue)，则设置为“true” |
+| Exchange     | String           | 路由此消息的交换器                                           |
+| Routing key  | String           | 发布者使用的路由key                                          |
+| Consumer tag | String           | 消费者（订阅）标识符                                         |
+
+以下是消息属性。其中大部分是可选的。它们由发布者在消息发布时设置：
+
+| 属性             | 类型                | 描述                                                         | 是否必须 |
+| ---------------- | ------------------- | ------------------------------------------------------------ | -------- |
+| Delivery mode    | Enum (1 or 2)       | 2 代表“persistent”，1 代表“transient”。一些客户端库将此属性公开为布尔值或枚举。 | Yes      |
+| Type             | String              | 特定于应用程序的消息类型，例如“orders.created”               | No       |
+| Headers          | Map (string => any) | 带有字符串标题名称的标题的任意映射                           | No       |
+| Content type     | String              | 内容类型, e.g. "application/json"。 由应用程序使用，而不是核心 RabbitMQ | No       |
+| Content encoding | String              | 内容编码, e.g. "gzip"。由应用程序使用，而不是核心 RabbitMQ   | No       |
+| Message ID       | String              | 任意消息 ID                                                  | No       |
+| Correlation ID   | String              | 帮助将请求与响应相关联, see [tutorial 6](https://www.rabbitmq.com/getstarted.html) | No       |
+| Reply To         | String              | 携带响应队列名称， see [tutorial 6](https://www.rabbitmq.com/getstarted.html) | No       |
+| Expiration       | String              | [每条消息的 TTL](https://www.rabbitmq.com/ttl.html)          | No       |
+| Timestamp        | Timestamp           | 应用程序提供的时间戳                                         | No       |
+| User ID          | String              | 用户 ID，如果设置则[验证](https://www.rabbitmq.com/validated-user-id.html) | No       |
+| App ID           | String              | 应用名称                                                     | No       |
+
+#### 消息类型
+
+消息的类型属性是一个任意字符串，可帮助应用程序传达消息的类型。它由发布者在消息发布时设置。该值可以是发布者和消费者同意的任何特定于域的字符串。
+
+RabbitMQ 不验证或使用此字段，它用于供应用程序和插件使用和解释。
+
+实践中的消息类型自然分为组，点分隔的命名约定是常见的（但 RabbitMQ 或客户端不需要），例如`orders.created` 或 `logs.line` 或 `profiles.image.changed`。
+
+如果消费者收到未知类型的交付，强烈建议记录此类事件，以便更轻松地进行故障排除。
+
+#### Content Type and Encoding
+
+内容（MIME 媒体）类型（Content Type）和内容编码（Encoding）字段允许发布者传达消费者应如何反序列化和解码消息有效负载。
+
+RabbitMQ 不验证或使用这些字段，它用于供应用程序和插件使用和解释。
+
+例如，带有 JSON 负载的消息[应该使用](http://www.ietf.org/rfc/rfc4627.txt)`application/json`。如果负载是使用 LZ77 (GZip) 算法压缩的，则其内容编码应为 `gzip`。
+
+可以通过用逗号分隔来指定多种编码。
+
+### 确认模式
+
+注册消费者应用程序时可以选择两种交付模式之一：
+
+- Automatic（自动交付不需要确认，又名“即发即忘”）
+- Manual（手动交付需要客户确认）
+
+消费者确认是一个[单独的文档指南](https://www.rabbitmq.com/confirms.html)的主题，连同发布确认，发布者的一个密切相关的概念。
+
+### 使用预取限制同时传送
+
+使用手动确认模式，消费者有一种方法可以限制“进行中”（通过网络传输或已交付但未确认）的交付数量。这可以避免消费者过载。
+
+此功能以及消费者确认是[单独文档指南的](https://www.rabbitmq.com/confirms.html)主题。
+
+### 消费者容量指标
+
+RabbitMQ [管理 UI](https://www.rabbitmq.com/management.html) 以及[监控数据](https://www.rabbitmq.com/monitoring.html)端点（例如 [Prometheus 抓取](https://www.rabbitmq.com/prometheus.html)的数据端点）显示了一个称为单个队列的消费者容量（以前称为消费者利用率）的指标。
+
+该指标计算为队列能够立即将消息传递给消费者的时间的一小部分。它有助于操作员注意可能值得向队列添加更多消费者（应用程序实例）的情况。
+
+如果此数字小于 100%，则在以下情况下，队列领导副本可能能够更快地传递消息：
+
+- 有更多的消费者或
+- 消费者花费更少的时间处理交付或
+- 消费者渠道使用了更高的预取值（见上一小节）
+
+对于没有消费者的队列，消费者容量将为 0%。对于有在线消费者但没有消息流的队列，该值将是 100%：这个想法是任何数量的消费者都可以维持这种交付率。
+
+请注意，消费者容量只是一个提示。消费者应用程序可以而且应该收集有关其操作的更具体的指标，以帮助调整大小和任何可能的容量变化。
+
+#### **Java Client**
+
+查看 [Java client guide](https://www.rabbitmq.com/api-guide.html#consuming) 示例。
+
+#### **.NET Client**
+
+查看 [.NET client guide](https://www.rabbitmq.com/dotnet-api-guide.html#consuming) 示例。
+
+### 获取单个消息（“Pull API”）
+
+使用 AMQP 0-9-1 可以使用`basic.get`协议方法一一获取消息。按 FIFO 顺序获取消息。可以使用自动或手动确认，就像消费者（订阅）一样。
+
+非常不推荐一条一条地获取消息，因为与常规的长期消费者相比，它的效率非常低。与任何基于轮询的算法一样，在消息发布是零星的并且队列可以长时间保持为空的系统中，这将是非常浪费的。
+
+如有疑问，更推荐使用普通的长寿命消费者。
+
+#### **Java Client**
+
+查看 [Java client guide](https://www.rabbitmq.com/api-guide.html#consuming) 示例。
+
+#### **.NET Client**
+
+查看 [.NET client guide](https://www.rabbitmq.com/dotnet-api-guide.html#consuming) 示例。
+
+### 送达确认超时
+
+在现代 RabbitMQ 版本中，对消费者交付确认强制执行超时。这有助于检测从不确认交付的错误（卡住）消费者。此类消费者可能会影响节点的磁盘数据压缩，并可能使节点耗尽磁盘空间。
+
+如果消费者未确认其交付超过超时值（默认为 30 分钟），则其通道将关闭，并显示 `PRECONDITION_FAILED` 通道异常。该错误将由消费者连接到的节点[记录](https://www.rabbitmq.com/logging.html)。
+
+超时值可在 [`rabbitmq.conf`] 中配置（以毫秒为单位）：
+
+```ini
+# 30 minutes in milliseconds
+consumer_timeout = 1800000
+```
+
+```ini
+# one hour in milliseconds
+consumer_timeout = 3600000
+```
+
+可以使用`advanced.config`禁用超时。这是非常不推荐的：
+
+```erlang
+%% advanced.config
+[
+  {rabbit, [
+    {consumer_timeout, undefined}
+  ]}
+].
+```
+
+与其完全禁用超时，不如考虑使用较高的值（例如，几个小时）。
+
+### 互斥性
+
+当使用 AMQP 0-9-1 客户端注册消费者时，可以将[exclusive](https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume)标志设置为 true 以请求消费者成为目标队列中唯一的消费者。仅当当时没有消费者已注册到队列时，调用才会成功。这允许确保一次只有一个消费者从队列中消费。
+
+如果独占消费者被取消或宕机，则应用程序负责注册一个新消费者以继续从队列中消费。
+
+如果需要独占消费和消费连续性，单一活跃消费者可能更合适。
+
+### 单一活跃消费者
+
+单个活动消费者允许在一个时间消耗队列中只有一个消费者，并在活动消费者被取消或宕机的情况下故障转移到另一个注册消费者。当消息必须按照消息到达队列的相同顺序被消费和处理时，仅使用一个消费者是很有用的。
+
+一个典型的事件序列如下：
+
+
+
 ## 队列和消息 TTL（Queue and Message TTL）
 
 ## 队列长度限制（Queue Length Limits）
