@@ -334,30 +334,30 @@ RabbitMQ 可以向订阅应用程序推送入队消息（传递）。这是通�
 
 以下属性是交付和路由详细信息；它们本身不是消息属性，而是由 RabbitMQ 在路由和交付时设置的：
 
-| 属性         | 类型             | 描述                                                         |
-| ------------ | ---------------- | ------------------------------------------------------------ |
-| Delivery tag | Positive integer | 交付标识符，见 [Confirms](https://www.rabbitmq.com/confirms.html). |
+| 属性           | 类型               | 描述                                                                                          |
+|--------------|------------------|---------------------------------------------------------------------------------------------|
+| Delivery tag | Positive integer | 交付标识符，见 [Confirms](https://www.rabbitmq.com/confirms.html).                                 |
 | Redelivered  | Boolean          | 如果此消息先前[已传递并重新排队](https://www.rabbitmq.com/confirms.html#consumer-nacks-requeue)，则设置为“true” |
-| Exchange     | String           | 路由此消息的交换器                                           |
-| Routing key  | String           | 发布者使用的路由key                                          |
-| Consumer tag | String           | 消费者（订阅）标识符                                         |
+| Exchange     | String           | 路由此消息的交换器                                                                                   |
+| Routing key  | String           | 发布者使用的路由key                                                                                 |
+| Consumer tag | String           | 消费者（订阅）标识符                                                                                  |
 
 以下是消息属性。其中大部分是可选的。它们由发布者在消息发布时设置：
 
-| 属性             | 类型                | 描述                                                         | 是否必须 |
-| ---------------- | ------------------- | ------------------------------------------------------------ | -------- |
-| Delivery mode    | Enum (1 or 2)       | 2 代表“persistent”，1 代表“transient”。一些客户端库将此属性公开为布尔值或枚举。 | Yes      |
-| Type             | String              | 特定于应用程序的消息类型，例如“orders.created”               | No       |
-| Headers          | Map (string => any) | 带有字符串标题名称的标题的任意映射                           | No       |
-| Content type     | String              | 内容类型, e.g. "application/json"。 由应用程序使用，而不是核心 RabbitMQ | No       |
-| Content encoding | String              | 内容编码, e.g. "gzip"。由应用程序使用，而不是核心 RabbitMQ   | No       |
-| Message ID       | String              | 任意消息 ID                                                  | No       |
-| Correlation ID   | String              | 帮助将请求与响应相关联, see [tutorial 6](https://www.rabbitmq.com/getstarted.html) | No       |
-| Reply To         | String              | 携带响应队列名称， see [tutorial 6](https://www.rabbitmq.com/getstarted.html) | No       |
-| Expiration       | String              | [每条消息的 TTL](https://www.rabbitmq.com/ttl.html)          | No       |
-| Timestamp        | Timestamp           | 应用程序提供的时间戳                                         | No       |
-| User ID          | String              | 用户 ID，如果设置则[验证](https://www.rabbitmq.com/validated-user-id.html) | No       |
-| App ID           | String              | 应用名称                                                     | No       |
+| 属性               | 类型                  | 描述                                                                      | 是否必须 |
+|------------------|---------------------|-------------------------------------------------------------------------|------|
+| Delivery mode    | Enum (1 or 2)       | 2 代表“persistent”，1 代表“transient”。一些客户端库将此属性公开为布尔值或枚举。                   | Yes  |
+| Type             | String              | 特定于应用程序的消息类型，例如“orders.created”                                         | No   |
+| Headers          | Map (string => any) | 带有字符串标题名称的标题的任意映射                                                       | No   |
+| Content type     | String              | 内容类型, e.g. "application/json"。 由应用程序使用，而不是核心 RabbitMQ                   | No   |
+| Content encoding | String              | 内容编码, e.g. "gzip"。由应用程序使用，而不是核心 RabbitMQ                                | No   |
+| Message ID       | String              | 任意消息 ID                                                                 | No   |
+| Correlation ID   | String              | 帮助将请求与响应相关联, see [tutorial 6](https://www.rabbitmq.com/getstarted.html) | No   |
+| Reply To         | String              | 携带响应队列名称， see [tutorial 6](https://www.rabbitmq.com/getstarted.html)    | No   |
+| Expiration       | String              | [每条消息的 TTL](https://www.rabbitmq.com/ttl.html)                          | No   |
+| Timestamp        | Timestamp           | 应用程序提供的时间戳                                                              | No   |
+| User ID          | String              | 用户 ID，如果设置则[验证](https://www.rabbitmq.com/validated-user-id.html)        | No   |
+| App ID           | String              | 应用名称                                                                    | No   |
 
 #### 消息类型
 
@@ -479,7 +479,67 @@ consumer_timeout = 3600000
 
 一个典型的事件序列如下：
 
+- 一个队列被声明，一些消费者几乎同时注册到它。
+- 第一个注册的消费者成为唯一的活动消费者：消息被分派给它，其他消费者被忽略。
+- 由于某种原因，单个活跃的消费者被取消或直接宕机。注册的消费者之一成为新的单一活动消费者，现在将消息分派给它。换句话说，队列自动故障转移到另一个消费者。
 
+请注意，如果没有启用单个活动消费者功能，消息将使用循环法分发给所有消费者。
+
+声明队列时可以启用单个活动消费者，并将 `x-single-active-consumer` 参数设置为 `true`，例如使用 Java 客户端：
+
+```java
+Channel ch = ...;
+Map<String, Object> arguments = new HashMap<String, Object>();
+arguments.put("x-single-active-consumer", true);
+ch.queueDeclare("my-queue", false, false, false, arguments);
+```
+
+与AMQP互斥性<sup>见本文《互斥性》</sup>消费者相比，单一活跃消费者对应用端保持消费连续性的压力更小。消费者只需要注册并自动处理故障转移，无需检测活动消费者故障并注册新消费者。
+
+ [management UI](https://www.rabbitmq.com/management.html)  和 [CLI](https://www.rabbitmq.com/rabbitmqctl.8.html) 可以报告<sup>见本文《消费者活动》</sup>哪个消费者是启用该功能的队列中的当前活动消费者。
+
+请注意以下有关单个活跃消费者的信息：
+
+- 对所选的活跃消费者没有保证，它是随机选择的，即使消费者优先级<sup>见本文《优先级》</sup>正在使用中。
+- 如果在队列上启用了单个活动消费者，则尝试注册一个将独占消费标志设置为 true 的消费者将导致错误（不可以即启用single-active-consumer又启用exclusive consumer）。
+- 消息总是传递给活跃的消费者，即使它在某个时候太忙了。当使用手动确认和 `basic.qos` 时，可能会发生这种情况，消费者可能忙于处理它使用 `basic.qos` 请求的最大数量的未确认消息。在这种情况下，其他消费者将被忽略并且消息被排队。
+- 不可能通过[策略](https://www.rabbitmq.com/parameters.html#policies)启用单个活动消费者。这是原因。RabbitMQ 中的策略本质上是动态的，它们可以来来去去，启用和禁用它们声明的功能。想象一下突然禁用队列中的单个活动消费者：broker将开始向非活动消费者发送消息，并且消息将被并行处理，这与单个活动消费者试图实现的完全相反。由于单个活动消费者的语义不能很好地与策略的动态特性配合使用，因此只能在使用队列参数声明队列时启用此功能。
+
+### 消费者活动
+
+[management UI](https://www.rabbitmq.com/management.html)  和 `list_consumers`  [CLI](https://www.rabbitmq.com/rabbitmqctl.8.html#list_consumers) 命令为消费者报告`active`标志。此标志的值取决于几个参数。
+
+- 对于经典队列，当未启用单一活跃消费者时，该标志始终为`true`。
+- 对于仲裁队列，当单个活动消费者未启用时，默认情况下该标志为`true`，如果消费者所连接的节点被怀疑已关闭，则该标志设置为`false`。
+- 如果启用单个活动消费者，则该标志仅针对当前单个活动消费者设置为`true`，如果活动消费者消失，队列中的其他消费者正在等待提升，因此他们的活动设置为`false`。
+
+### 优先事项
+
+通常，连接到队列的活动消费者以循环(round-robin)方式从队列接收消息。
+
+消费者优先级允许您确保高优先级消费者在活动时接收消息，只有当高优先级消费者被阻止时，消息才会发送到低优先级消费者，例如通过有效的预取设置<sup>见本文《使用预取限制同时传送》</sup>。
+
+当使用消费者优先级时，如果存在多个具有相同高优先级的活动消费者，则消息将循环传递。
+
+消费者优先事项包含在[单独的指南中](https://www.rabbitmq.com/consumer-priority.html)<sup>在本文当《Consumer Priorities》</sup>。
+
+### 异常处理
+
+消费者应处理在处理交付或任何其他消费者操作期间出现的任何异常。应该记录、收集和忽略此类异常。
+
+如果消费者由于依赖项不可用或类似原因而无法处理交付，它应该清楚地记录下来并取消本身，直到它能够再次处理交付。这将使消费者的不可用状态对 RabbitMQ 和[监控系统](https://www.rabbitmq.com/monitoring.html)可见。
+
+### 并发注意事项
+
+消费者并发主要是客户端库实现细节和应用程序配置的问题。对于大多数客户端库（例如 Java、.NET、Go、Erlang），交付被分派到处理所有异步消费者操作的线程池（或类似的）。池通常具有可控的并发度。
+
+Java 和 .NET 客户端保证，无论并发程度如何，单个通道上的交付都将按照收到的相同顺序进行分派。请注意，一旦分派，并发处理交付将导致执行处理的线程之间的自然竞争条件。
+
+某些客户端（例如 Bunny）和框架可能会选择将消费者调度池限制为单个线程（或类似线程），以避免在并发处理交付时出现自然竞争条件。一些应用程序依赖于严格的交付顺序处理，因此必须使用并发因子为 1 或在自己的代码中处理同步。可以并发处理交付的应用程序，可以使用最多可用于它们的内核数量的并发度。
+
+#### 队列并行性注意事项
+
+单个 RabbitMQ 队列绑定到单个核心。使用多个队列来提高节点上的 CPU 利用率。分片和一致性哈希交换等插件有助于提高并行度。---见队列指南
 
 ## 队列和消息 TTL（Queue and Message TTL）
 
