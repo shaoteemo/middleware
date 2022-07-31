@@ -140,15 +140,15 @@ RabbitMQ 中的队列是消息的有序集合。消息以先进先出（FIFO）�
 
 如果一个队列从来没有任何消费者，例如，当所有消费都使用 `basic.get` 方法（“pull”API）时，它不会被自动删除。对于这种情况，请使用独占队列或队列 TTL。
 
-### 独占队列（Exclusive Queues）
+### 互斥队列（Exclusive Queues）
 
-独占队列只能由其声明的连接使用（使用、清除、删除等）。尝试使用来自不同连接的独占队列将导致通道级异常 `RESOURCE_LOCKED`，并显示一条错误消息，指出`cannot obtain exclusive access to locked queue`（无法获得对锁定队列的独占访问）。
+互斥队列只能由其声明的连接使用（使用、清除、删除等）。尝试使用来自不同连接的独占队列将导致通道级异常 `RESOURCE_LOCKED`，并显示一条错误消息，指出`cannot obtain exclusive access to locked queue`（无法获得对锁定队列的独占访问）。
 
-独占队列在声明连接关闭或消失时被删除（例如，由于底层 TCP 连接丢失）。因此，它们仅适用于客户端特定的瞬态。
+互斥队列在声明连接关闭或消失时被删除（例如，由于底层 TCP 连接丢失）。因此，它们仅适用于客户端特定的瞬态。
 
-使独占队列以服务器命名是很常见的。
+使互斥队列以服务器命名是很常见的。
 
-在 RabbitMQ 3.9 及以下版本中，独占队列受限于领导者位置选择过程（[leader location selection process](https://www.rabbitmq.com/ha.html#queue-leader-location)）。为确保它位于建立连接的同一集群节点上，请在声明队列时设置 `x-queue-master-locator="client-local"`。
+在 RabbitMQ 3.9 及以下版本中，互斥队列受限于领导者位置选择过程（[leader location selection process](https://www.rabbitmq.com/ha.html#queue-leader-location)）。为确保它位于建立连接的同一集群节点上，请在声明队列时设置 `x-queue-master-locator="client-local"`。
 
 ### 复制和分布式队列
 
@@ -267,7 +267,7 @@ RabbitMQ 收集有关队列的多个指标。它们中的大部分都可以通�
 
 ### 术语
 
-术语“消费者”在不同的上下文中意味着不同的事物。一般来说，在消息传递中，消费者是消费消息的应用程序（或应用程序实例）。 同一个应用程序还可以发布消息，从而同时成为发布者。
+术语“消费者”在不同的上下文中表示不同的事物。一般来说，在消息传递中，消费者是消费消息的应用程序（或应用程序实例）。 同一个应用程序还可以发布消息，从而同时成为发布者。
 
 消息传递协议还具有持久订阅消息传递的概念。订阅是通常用于描述此类实体的一个术语。 消费者是另一个。 RabbitMQ 支持的消息传递协议使用这两个术语，但 RabbitMQ 文档倾向于使用后者。
 
@@ -542,6 +542,129 @@ Java 和 .NET 客户端保证，无论并发程度如何，单个通道上的交
 单个 RabbitMQ 队列绑定到单个核心。使用多个队列来提高节点上的 CPU 利用率。分片和一致性哈希交换等插件有助于提高并行度。---见队列指南
 
 ## 队列和消息 TTL（Queue and Message TTL）
+
+### Time-To-Live and Expiration
+
+#### 概述
+
+RabbitMQ 允许您为消息和队列设置 TTL（生存时间）。这由可选的队列<sup>见队列指南部分</sup>参数控制，最好使用[策略](https://www.rabbitmq.com/parameters.html)来完成。
+
+消息 TTL 可以应用于单个队列、一组队列或逐条消息应用。TTL 设置也可以由[操作员策略](https://www.rabbitmq.com/parameters.html#operator-policies)强制执行。
+
+#### 队列中的每条队列消息 TTL
+
+可以通过使用策略设置`message-ttl`参数或在队列声明时指定相同参数来为给定队列设置消息 TTL。
+
+如果消息在队列中的停留时间超过配置的 TTL，则称该消息*dead*。请注意，路由到多个队列的消息可能会在不同的时间消失，或者根本不会在它所在的每个队列中消失。一个队列中消息的死亡不会影响其他队列中同一消息的生命周期。
+
+服务器保证死消息不会使用`basic.deliver`传递（给消费者）或包含在`basic.get-ok`响应中（用于一次性获取操作）。此外，服务器将尝试在基于 TTL 的到期时或之后不久删除消息。
+
+TTL 参数或策略的值必须是非负整数 (0 <= n)，以毫秒为单位描述 TTL 周期。因此，值 1000 表示添加到队列的消息将在队列中存在 1 秒或直到它被传递给消费者。参数可以是 AMQP 0-9-1 类型的`short-short-int`、`short-int`、`long-int` 或 `long-long-int`。
+
+#### 使用策略为队列定义消息 TTL
+
+要使用策略指定 TTL，请将key“message-ttl”添加到策略定义中：
+
+| rabbitmqctl               | `rabbitmqctl set_policy TTL ".*" '{"message-ttl":60000}' --apply-to queues` |
+| :------------------------ | ------------------------------------------------------------ |
+| **rabbitmqctl (Windows)** | **`rabbitmqctl set_policy TTL ".*" "{""message-ttl"":60000}" --apply-to queues`** |
+
+这会将 60 秒的 TTL 应用于所有队列。
+
+#### 在声明期间使用x-arguments为队列定义消息 TTL
+
+这个 Java 示例创建了一个队列，其中消息最多可驻留 60 秒：
+
+```java
+Map<String, Object> args = new HashMap<String, Object>();
+args.put("x-message-ttl", 60000);
+channel.queueDeclare("myqueue", false, false, false, args);
+```
+
+C# 中的相同示例：
+
+```C#
+var args = new Dictionary<string, object>();
+args.Add("x-message-ttl", 60000);
+model.QueueDeclare("myqueue", false, false, false, args);
+```
+
+可以将消息 TTL 策略应用于其中已经有消息的队列，但这涉及一些警告<sup>见下面的内容</sup>。
+
+如果消息被重新排队（例如由于使用具有重新排队参数的 AMQP 方法，或由于通道关闭），则会保留消息的原始到期时间。
+
+将 TTL 设置为 0 会导致消息在到达队列时过期，除非它们可以立即传递给消费者。因此，这为 RabbitMQ 服务器不支持的立即发布标志`immediate`提供了替代方案。与该标志不同，没有发出`basic.returns`，如果设置了死信交换，则消息将是死信的。
+
+### 发布者中的每条消息 TTL
+
+通过在发布消息时设置过期属性，可以在每条消息的基础上指定 TTL。
+
+`expiration`字段的值以毫秒为单位描述 TTL 周期。适用与`x-message-ttl`相同的约束。由于`expiration`字段必须是字符串，因此MQ服务器（broker）将（仅）接受数字的字符串表示形式。
+
+当同时指定每个队列和每条消息的 TTL 时，将选择两者之间的较低值。
+
+此示例使用 RabbitMQ Java 客户端发布消息，该消息最多可在队列中驻留 60 秒：
+
+```java
+byte[] messageBodyBytes = "Hello, world!".getBytes();
+AMQP.BasicProperties properties = new AMQP.BasicProperties.Builder()
+                                   .expiration("60000")
+                                   .build();
+channel.basicPublish("my-exchange", "routing-key", properties, messageBodyBytes);
+```
+
+C# 中的相同示例：
+
+```c#
+byte[] messageBodyBytes = System.Text.Encoding.UTF8.GetBytes("Hello, world!");
+
+IBasicProperties props = model.CreateBasicProperties();
+props.ContentType = "text/plain";
+props.DeliveryMode = 2;
+props.Expiration = "60000";
+
+model.BasicPublish(exchangeName,
+                   routingKey, props,
+                   messageBodyBytes);
+```
+
+### 注意事项
+
+当特定事件发生时，追溯应用每条消息 TTL 的队列（当它们已经有消息时）将丢弃这些消息。只有当过期消息到达队列的首条时，它们才会真正被丢弃（或死信）。消费者不会收到已过期的消息传递给他们。请记住，消息过期和消费者交付之间可能存在自然竞争条件，例如：消息可以在写入套接字之后但在到达消费者之前过期。
+
+设置每条消息的 TTL 过期消息时，可以在未过期消息后面排队，直到后者被消耗或过期。因此，此类过期消息使用的资源不会被释放，它们将被计入队列统计信息（例如：队列中的消息数）。
+
+在追溯应用每条消息的 TTL 策略时，建议让消费者在线以确保更快地丢弃消息。
+
+鉴于现有队列上的每个消息 TTL 设置的这种行为，当需要删除消息以释放资源时，应该使用队列 TTL（或队列清除或队列删除）。
+
+### 队列 TTL
+
+TTL 也可以在队列上设置，而不仅仅是队列内容。队列只有在不使用时（例如：没有消费者）才会在一段时间后过期。此功能可以与自动删除队列属性<sup>见队列指南</sup>一起使用。
+
+可以通过将`x-expires`参数设置为`queue.declare`或通过设置`expires`策略来为给定队列设置到期时间。这控制了一个队列在被自动删除之前可以被使用多长时间。未使用表示队列没有消费者，队列最近没有被重新声明（重新声明更新租约），并且至少在到期期间没有调用`basic.get`。例如，这可以用于 RPC 样式的回复队列，其中可以创建许多可能永远不会耗尽的队列。
+
+服务器保证队列将被删除，如果至少在到期期间未使用。不保证在过期期限过后多久移除队列。当服务器重新启动时，持久队列的租约会重新启动。
+
+`x-expires`参数或`expires`策略的值以毫秒为单位描述过期时间。它必须是一个正整数（与消息 TTL 不同，它不能为 0）。因此，值为 1000 表示将删除 1 秒内未使用的队列。
+
+#### 使用策略为队列定义队列 TTL
+
+以下策略使所有队列在自上次使用后 30 分钟后过期：
+
+| rabbitmqctl               | `rabbitmqctl set_policy expiry ".*" '{"expires":1800000}' --apply-to queues` |
+| :------------------------ | ------------------------------------------------------------ |
+| **rabbitmqctl (Windows)** | **`rabbitmqctl.bat set_policy expiry ".*" "{""expires"":1800000}" --apply-to queues`** |
+
+#### 在声明期间使用 x-arguments 为队列定义队列 TTL
+
+Java 中的这个示例创建了一个队列，该队列在 30 分钟未使用后过期。
+
+```java
+Map<String, Object> args = new HashMap<String, Object>();
+args.put("x-expires", 1800000);
+channel.queueDeclare("myqueue", false, false, false, args);
+```
 
 ## 队列长度限制（Queue Length Limits）
 
