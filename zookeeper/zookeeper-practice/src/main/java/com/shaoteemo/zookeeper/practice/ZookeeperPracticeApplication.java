@@ -28,7 +28,6 @@ import java.rmi.registry.Registry;
  * 所属包：com.shaoteemo.zookeeper.practice
  *
  * @author ShaoTeemo
- * @date 2021/10/4
  * @since 1.0
  */
 @SpringBootApplication
@@ -79,7 +78,7 @@ public class ZookeeperPracticeApplication {
             zooKeeper.create(path, data.getBytes(StandardCharsets.UTF_8), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
             logger.info("{}服务已发布！", path);
         } catch (IOException | KeeperException | InterruptedException e) {
-            e.printStackTrace();
+            logger.error("", e);
         }
     }
 

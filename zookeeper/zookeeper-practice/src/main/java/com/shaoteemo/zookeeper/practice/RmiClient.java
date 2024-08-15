@@ -21,7 +21,6 @@ import java.rmi.RemoteException;
  * Rmi客户端
  *
  * @author ShaoTeemo
- * @date 2021/10/4
  * @since 1.0
  */
 public class RmiClient {
@@ -42,12 +41,13 @@ public class RmiClient {
             ZooKeeper zooKeeper = new ZooKeeper(Constants.HOST, Constants.TIME_OUT, new WatchHandler());
             byte[] bytes = zooKeeper.getData("/" + serviceBeanName, new WatchHandler(), new Stat());
             String data = new String(bytes);
-            logger.info("服务" + serviceBeanName + "的连接信息: {}", data);
+            logger.info("服务{}的连接信息: {}", serviceBeanName, data);
             return data;
         } catch (IOException | KeeperException | InterruptedException e) {
-            e.printStackTrace();
-            logger.error("获取服务" + serviceBeanName + "的连接信息失败!");
+            logger.error("获取服务{}的连接信息失败!", serviceBeanName, e);
             return "";
+        }finally {
+
         }
     }
 

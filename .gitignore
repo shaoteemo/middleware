@@ -1,3 +1,6 @@
 *.iml
 /**/.idea
 /**/target
+*.png
+*.jpg
+*.gif

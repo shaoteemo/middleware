@@ -8,7 +8,6 @@ import java.rmi.RemoteException;
  * 所属包：com.shaoteemo.zookeeper
  * 定义提供远程调用的接口
  * @author ShaoTeemo
- * @date 2021/10/4
  * @since 1.0
  */
 public interface RmiMethodService extends Remote {

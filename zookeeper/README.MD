@@ -191,8 +191,6 @@ $ tar -zxf apache-zookeeper-3.7.0-bin.tar.gz、
 
    给上面的脚本权限即可运行。
 
-
-
 #### 2.4.启动对应搭建版本服务
 
 根据当前环境在`bin`目录中运行`zkServer.sh`脚本，即可启动zookeeper。
@@ -297,6 +295,13 @@ $ ./zkCli.sh version
 
 ![](http://rep.shaoteemo.com/zkcli_bash_version.png)
 
+### 4.环境变量
+
+```bash
+export ZOOKEEPER_HOME=/opt/zookeeper-3.7.2
+export PATH=$PATH:$JAVA_HOME/bin:$ZOOKEEPER_HOME
+```
+
 ### 文档
 
 [搭建单机版（官方文档）](https://zookeeper.apache.org/doc/r3.7.0/zookeeperStarted.html#sc_InstallingSingleMode)
@@ -308,6 +313,11 @@ $ ./zkCli.sh version
 本节介绍部分常用的zkCli指令使用方式。详细请查看官方文档：[ZooKeeper CLI](http://zookeeper.apache.org/doc/r3.7.0/zookeeperCLI.html)
 
 > 注意：本节内容均在使用zkCli连接过后的界面操作。详情请看《环境搭建细节》第3小节
+
+```bash
+# 连接zookeeper。连接本机可忽略IP和默认的端口2181。
+$ ./zkCli.sh -server 127.0.0.1:2181
+```
 
 通过zkCli连接到zookeeper后使用`help`出现如下指令提示：
 
@@ -339,11 +349,11 @@ ZooKeeper -server host:port -client-configuration properties-file cmd args
         setquota -n|-b|-N|-B val path
         stat [-w] path
         sync path
-        version 
+        version
         whoami
 ```
 
-### 1.`ls`：列出一条路径的子节点。
+### `ls`：列出一条路径的子节点。
 
 ```bash
 [zkShell] ls [-s] [-w] [-R] path
@@ -359,14 +369,28 @@ Example1：列出root节点下的子节点。
 
 ```bash
 [zkShell] ls /
+[zkShell] ls -s /
 ```
 
 ```
 output:
 	[zookeeper]
+output:
+	[zookeeper]
+    cZxid = 0x0
+    ctime = Thu Jan 01 08:00:00 CST 1970
+    mZxid = 0x0
+    mtime = Thu Jan 01 08:00:00 CST 1970
+    pZxid = 0x0
+    cversion = -1
+    dataVersion = 0
+    aclVersion = 0
+    ephemeralOwner = 0x0
+    dataLength = 0
+    numChildren = 1
 ```
 
-### 2.`create`：创建一个 znode。
+### `create`：创建一个 znode。
 
 ```bash
 [zkShell] create [-s] [-e] [-c] [-t ttl] path [data] [acl]
@@ -419,7 +443,7 @@ output:
 	Created /ephemeral_sequential_node0000000002
 ```
 
-### 3.`get`：获取特定路径的数据
+### `get`：获取特定路径的数据
 
 ```bash
 [zkShell] get [-s] [-w] path
@@ -437,45 +461,21 @@ Example1：
 
 ```
 output:
-	persistent
-	cZxid = 0x300000006
-	ctime = Sun Oct 03 14:43:05 CST 2021
-	mZxid = 0x300000006 #最近一次更新的zxid
-	mtime = Sun Oct 03 14:43:05 CST 2021
-	pZxid = 0x300000006
-	cversion = 0
-	dataVersion = 0
-	aclVersion = 0
-	ephemeralOwner = 0x0
-	dataLength = 10
-	numChildren = 0
+	persistent	#节点上存储的数据
+	cZxid = 0x300000006	# 创建时zxid(znode 每次改变时递增的事务id)
+	ctime = Sun Oct 03 14:43:05 CST 2021 # 创建时间戳
+	mZxid = 0x300000006 #最近一次更新的zxid # 最近一次更新的zxid
+	mtime = Sun Oct 03 14:43:05 CST 2021 # 最近一次更新的时间戳
+	pZxid = 0x300000006 # 子节点的zxid
+	cversion = 0	# 子节点更新次数
+	dataVersion = 0		# 节点数据更新次数
+	aclVersion = 0		# 节点ACL(授权信息)的更新次数
+	ephemeralOwner = 0x0 # 如果该节点为ephemeral 节点( 临时， 生命周期与session 一样),ephemeralOwner 值表示与该节点绑定的session id. 如果该节点不是ephemeral 节点, ephemeralOwner 值为0.
+	dataLength = 10 	# 节点数据字节数
+	numChildren = 0		# 子节点数量
 ```
 
-persistent ：节点上存储的数据
-
-cZxid:创建时zxid(znode 每次改变时递增的事务id)
-
-ctime:创建时间戳
-
-mZxid:最近一次更新的zxid
-
-mtime:最近一次更新的时间戳
-
-pZxid:子节点的zxid
-
-cversion:子节点更新次数
-
-dataversion:节点数据更新次数
-
-aclVersion:节点ACL(授权信息)的更新次数
-
-ephemeralOwner: 如果该节点为ephemeral 节点( 临时， 生命周期与session 一样),ephemeralOwner 值表示与该节点绑定的session id. 如果该节点不是ephemeral 节点, ephemeralOwner 值为0.
-
-dataLength:节点数据字节数
-
-numChildren:子节点数量
-
-### 4.`set`：设置/更新路径上的数据。
+### `set`：设置/更新路径上的数据。
 
 ```bash
 [zkShell] set [-s] [-v version] path data
@@ -497,7 +497,7 @@ output:
 	WatchedEvent state:SyncConnected type:NodeDataChanged path:/persistent
 ```
 
-### 5.`delete` ：删除具有特定路径的节点
+### `delete` ：删除具有特定路径的节点
 
 ```bash
 [zkShell] delete [-v version] path
@@ -505,8 +505,20 @@ output:
 
 Example1：删除/persistent
 
+```bash
+[zkShell] delete /persistent
 ```
-bash delete /persistent
+
+### `deleteall`：递归删除多级节点
+
+```bash
+[zkShell] deleteall path [-b batch size]
+```
+
+### `stat`：查看节点状态
+
+```bash
+[zkShell] stat [-w] path
 ```
 
 ## JavaAPI
@@ -621,12 +633,12 @@ Zookeeper底层是一套数据结构。结构采用树形结构。而且znode还
 
 1. PERSISTENT：持久化目录节点。客户端与zookeeper断开连接后，该节点依然存在。
 2. PERSISTENT_SEQUENTIAL：持久化顺序编号目录节点。客户端与zookeeper断开连接后，该节点依然存在并且zookeeper会给该节点名称进行顺序编号。
-3. EPHEMERAL：临时目录节点。客户端与zookeeper断开后，该节点删除。
-4. EPHEMERAL_SEQUENTIAL：临时顺序编号目录节点。客户端与zookeeper断开后，该节点删除并且zookeeper会给该节点名称进行顺序编号。
+3. EPHEMERAL：临时目录节点。客户端与zookeeper断开后，该节点删除。临时znode没有子节点。
+4. EPHEMERAL_SEQUENTIAL：临时顺序编号目录节点。客户端与zookeeper断开后，该节点删除并且zookeeper会给该节点名称进行顺序编号。临时znode没有子节点。
 5. Container Nodes（3.6.0版本添加）：ZooKeeper 有容器 znode 的概念。容器 znode 是特殊用途的 znode，可用于领导者、锁定等方法。当容器的最后一个子节点被删除时，该容器将成为将来某个时间点被服务器删除的候选对象。
 6. TTL Nodes（3.6.0版本添加）：创建 **PERSISTENT** 或 **PERSISTENT_SEQUENTIAL** znode 时，您可以选择为 znode 设置以毫秒为单位的 TTL。如果在 TTL 内没有修改 znode 并且没有子节点，它将成为服务器在未来某个时间点删除的候选节点。
 
-Zookeeper中每一个节点类型称为**znode**节点类型，其中\ （root）为节点名称，每一个znode默认可以存储1Mb的数据。这种节点与Unix文件系统路径相似，可以向节点存储、获取数据。
+Zookeeper中每一个节点类型称为**znode**节点类型，其中\ （root）为节点名称，每一个znode默认可以存储1Mb的数据，记录了zxid等元数据信息。这种节点与Unix文件系统路径相似，可以向节点存储、获取数据。
 
 ### 2.监听通知机制
 
@@ -691,7 +703,146 @@ QuorumPeerMain 启动 ZooKeeper 服务器，还注册了[JMX](http://java.sun.co
     $ bin/zkCli.sh -server 127.0.0.1:2181
 ```
 
-### 4.配置参数详解
+### 4.Zookeeper选举机制
+
+leader很重要，如果挂了怎么办？开始选举新的leader
+
+ZooKeeper服务器四种状态：
+
+- looking：服务器处于寻找Leader群首的状态
+- leading：服务器作为群首时的状态
+- following：服务器作为follower跟随者时的状态
+- observing：服务器作为观察者时的状态
+
+> leader选举分两种情况
+>
+> - 集群初始启动时：安装后首次启动时
+> - 集群运行中leader挂了时
+
+**集群启动时的Leader选举**
+
+![](doc_img\zk_xuanju.png)
+
+- 以3台机器组成的ZooKeeper集群为例
+
+- 原则：集群中过半数Server启动后，才能选举出Leader；
+
+- 此处quorum数是多少？
+
+- 每个server投票信息**vote信息**结构为(sid, zxid)；
+
+  server1~3初始投票信息分别为：
+
+  server1 -> (1, 0) server2 -> (2, 0) server3 -> (3, 0)
+
+- **leader选举公式**：
+
+  server1 (sid1, zxid1)
+
+  server2 (sid2, zxid2)
+
+  **zxid大的server胜出；若zxid相等，再根据判断sid判断，sid大的胜出**
+
+- 依次启动ZK1、ZK2、ZK3 选举的流程：
+
+  - ZK1和ZK2票投给自己；ZK1的投票为(1, 0)，ZK2的投票为(2, 0)，并各自将投票信息分发给其他机器。
+  - 处理投票。每个server将收到的投票和自己的投票对比；ZK1更新自己的投票为(2, 0)，并将投票重新发送给ZK2。
+  - 统计投票。server统计投票信息，是否有半数server投同一个服务器为leader；
+  - 改变服务器状态。确定Leader后，各服务器更新自己的状态，Follower变为FOLLOWING；Leader变为LEADING。
+  - 当ZK3启动时，发现已有Leader，不再选举，直接从LOOKING改为FOLLOWING。
+
+- 同时ZK1、ZK2、ZK3 选举的流程：
+
+  - ZK1-> (1, 0) ZK2-> (2, 0) ZK3 -> (3, 0) -> ZK3被选中为Leader,其他两台节点被选为Follower。
+
+**集群运行时新leader选举**
+
+![](doc_img\zk_xuanju_start.png)
+
+### 5.脑裂和服务器数量选取
+
+服务器数量选取：ZK集群的服务器的数量通常为奇数台(3,5,7,9)
+
+脑裂：同集群出现了多个Leader。在特殊情况下网络问题出现分区，导致不同区域选择了各自的Leader。
+
+### 6.分布式集群相关问题
+
+leader在通知follower执行某条命令时，如何保障每个follower都收到，并执行呢？底层使用：队列结构（FIFO）
+
+CAP：Consistency一致性；Availability可用性；Partition Tolerance分区容错；Zookeeper满足CP。
+
+zookeeper集群特点：
+
+| 特点       | 说明                                                         |
+| ---------- | ------------------------------------------------------------ |
+| 最终一致性 | 为客户端展示同一个视图，以保证每个节点看到的数据一致         |
+| 可靠性     | 如果消息被一台服务器接受，那么它将倍所有的服务器接受         |
+| 实时性     | Zookeeper不能保证两个客户端能同时<br/>得到刚更新 的数据，如果需要最新数据<br/>应该在读数据之前调 用sync()接口。 |
+| 独立性     | 各个Client之间互不干预                                       |
+| 原子性     | 更新只能成功或者失败，没有中间状态。                         |
+| 顺序性     | 所有Server，同一消息发布顺序一致。                           |
+
+### 7.会话（Session）
+
+![zk_session1](doc_img\zk_session1.png)
+
+**定义：**客户端通过TCP协议与独立服务器或者一个集群中的某个服务器建立TCP长连接。
+
+**特点：**
+
+1. 会话提供顺序保障，即同一个会话中的请求以FIFO的顺序执行。如果客户端有多个并发会话，FIFO顺序在多个会话之间未必能够保持。
+2. 如果连接的Server出现问题，在没有超过Timeout时间时，可以连接其它节点。ZooKeeper客户端透明地转移一个会话到不同的服务器。
+3. 同一session期内的特性不变
+4. 当一个会话因某种原因终止，在这个会话期间创建的临时节点将会消失。
+
+**生命周期：**
+
+![zk_s_life](doc_img\zk_s_life.png)
+
+**Session是由谁来创建的？**
+
+Leader：产生一个唯一的session，放到消息队列，让所有server知道。
+
+过半机制：保证session创建成功或者失败。
+
+### 8.事件监听原理
+
+Watcher 在 ZooKeeper 是一个核心功能，Watcher 可以监控目录节点的数据变化以及子节点的变化，一旦这些状态发生变化，服务器就会通知所有设置在这个目录节点上的Watcher，从而每个客户端都很快知道它所关注的目录节点的状态发生变化，而做出相应的反应。见《 [Developers - Programmer's Guide(开发者指南中文版).MD](zookeeper docs\Developers - Programmer's Guide(开发者指南中文版).MD) 》
+
+### 9.工作原理
+
+ZooKeeper的核心是原子广播，这个机制保证了各个server之间的信息同步。实现这个机制的协议叫做ZAB协议。
+
+**ZAB协议有两种模式：**
+
+1.恢复模式：当服务启动或者在领导者崩溃后，ZAB就进入了恢复模式。当领导者被选举出来，且大多数server的完成了和leader的状态同步以后，恢复模式就结束了。状态同步保证了leader和follower以及observer具有相同的系统状态。
+
+完成leader选举后，zk就进入ZooKeeper之间状态同步过程
+
+1. leader等待server连接；
+2. Follower连接leader，将最大的zxid发送给leader；
+3. Leader根据follower的zxid确定同步点；
+4. 完成同步后通知follower 已经成为uptodate状态；
+5. Follower收到uptodate消息后，又可以重新接受client的请求进行服务了。
+
+![img](doc_img\stat-sync.png)
+
+2.广播模式
+
+广播模式需要保证proposal被按顺序处理，因此zk采用了递增的事务id号(zxid)来保证。所有的提议(proposal)都在被提出的时候加上了zxid(比如：0x1000000300000002)。
+
+epoch也称为纪元数字。实现中zxid是一个64位的数字，它高32位是epoch用来标识leader关系是否改变，每次一个leader被选出来，它都会有一个新的epoch，低32位是个递增计数。
+
+![img](doc_img\wps12.png)
+
+1. 在Client向Follwer发出一个写的请求
+2. Follwer把请求发送给Leader
+3. Leader接收到以后开始发起投票并通知Follwer进行投票
+4. Follwer把投票结果发送给Leader
+5. Leader将结果汇总后如果需要写入，则开始写入同时把写入操作通知给Follwer，然后commit
+6. Follwer把请求结果返回给Client
+
+### 附录一：配置参数详解
 
 ❌**快速搭建的读者，请跳过此节**❌
 

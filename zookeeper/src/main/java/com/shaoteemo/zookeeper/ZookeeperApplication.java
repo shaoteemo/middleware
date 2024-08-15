@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 所属包：com.shaoteemo.zookeeper
  *
  * @author ShaoTeemo
- * @date 2021/10/3
  * @since 1.0
  */
 @SpringBootApplication

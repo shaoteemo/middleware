@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 所属项目：middleware
@@ -17,8 +18,8 @@ import java.io.IOException;
  * <p>
  * 本案例讲解ZNode的操作
  * 注意：有个能在运行测试类的时候会报错。如果为连接丢失、会话失效请重新运行。
+ *
  * @author ShaoTeemo
- * @date 2021/10/3
  * @since 1.0
  */
 public class ZNodeOperate {
@@ -63,12 +64,49 @@ public class ZNodeOperate {
         zkConn.getChildren("/my", getWatcher()).forEach(item -> {
             try {
                 byte[] data = zkConn.getData("/my/" + item, getWatcher(), getStat());
-                log.info("获取的节点{}数据：{}", "/my/" + item,getString(data));
+                log.info("获取的节点{}数据：{}", "/my/" + item, getString(data));
             } catch (KeeperException | InterruptedException e) {
-                e.printStackTrace();
+                log.error("", e);
             }
         });
 
+    }
+
+    /**
+     * 获取节点状态信息
+     */
+    @Test
+    public void getDataStat() {
+        ZooKeeper zkConn = getZookeeperConnection();
+        String result = null;
+        Stat stat = new Stat();
+        try {
+            byte[] data = zkConn.getData("/itbaizhan", null, stat);
+            result = new String(data);
+        } catch (KeeperException | InterruptedException e) {
+            log.error(e.getMessage());
+        }
+        log.info("getData result------{{}}", result);
+        log.info("getData stat------{{}}", stat);
+    }
+
+    /**
+     * 获取子节点及数据
+     */
+    @Test
+    public void getChildrenData() {
+        try {
+            ZooKeeper zkConn = getZookeeperConnection();
+            List<String> childrenList = zkConn.getChildren("/", true);
+            String data = null;
+            //遍历子节点
+            for (String child : childrenList) {
+                data = new String(zkConn.getData("/" + child, null, null));
+                log.info("child:{{}},value:{{}}", child, data);
+            }
+        } catch (KeeperException | InterruptedException e) {
+            log.error(e.getMessage());
+        }
     }
 
     /**
@@ -78,13 +116,13 @@ public class ZNodeOperate {
     public void setValueToZNode() throws InterruptedException, KeeperException {
         ZooKeeper zkConn = getZookeeperConnection();
         /*
-        *  如果存在这样的节点并且给定版本与节点的版本匹配（如果给定版本为 -1，则它与任何节点的版本匹配），则为给定路径的节点设置数据。 返回节点的状态。
-        *  path – 节点的路径
-        *  data – 要设置的数据
-        *  version – 预期的匹配版本(注：-1与任何节点的版本匹配)
-        * */
+         *  如果存在这样的节点并且给定版本与节点的版本匹配（如果给定版本为 -1，则它与任何节点的版本匹配），则为给定路径的节点设置数据。 返回节点的状态。
+         *  path – 节点的路径
+         *  data – 要设置的数据
+         *  version – 预期的匹配版本(注：-1与任何节点的版本匹配)
+         * */
         Stat shaoteemo_update = zkConn.setData("/my/test", getBytes("shaoteemo_update"), -1);
-        log.info("返回的节点详细信息：{}" , shaoteemo_update);
+        log.info("返回的节点详细信息：{}", shaoteemo_update);
     }
 
     /**
@@ -93,8 +131,8 @@ public class ZNodeOperate {
     @Test
     public void deleteZNode() throws InterruptedException, KeeperException {
         ZooKeeper zkConn = getZookeeperConnection();
-        zkConn.delete("/my" , -1);
-        log.info("节点 /my 删除成功！" );
+        zkConn.delete("/my", -1);
+        log.info("节点 /my 删除成功！");
     }
 
     /*获取连接信息*/
@@ -102,8 +140,8 @@ public class ZNodeOperate {
         try {
             return new ZooKeeper(Constants.HOST, Constants.TIME_OUT, getWatcher());
         } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+            log.error("Create Connection error:", e);
+            throw new RuntimeException();
         }
     }
 

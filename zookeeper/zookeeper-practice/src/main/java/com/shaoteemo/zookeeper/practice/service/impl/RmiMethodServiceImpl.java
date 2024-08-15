@@ -11,7 +11,6 @@ import java.rmi.server.UnicastRemoteObject;
  * Rmi提供远程调用具体实现类。
  *
  * @author ShaoTeemo
- * @date 2021/10/4
  * @since 1.0
  */
 public class RmiMethodServiceImpl extends UnicastRemoteObject implements RmiMethodService {

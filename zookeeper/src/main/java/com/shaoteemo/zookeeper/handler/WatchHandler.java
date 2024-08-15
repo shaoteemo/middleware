@@ -8,11 +8,9 @@ import org.slf4j.LoggerFactory;
 /**
  * 所属项目：middleware
  * 所属包：com.shaoteemo.zookeeper.handler
- *
  * Zookeeper事件通知处理器
  *
  * @author ShaoTeemo
- * @date 2021/10/3
  * @since 1.0
  */
 public class WatchHandler implements Watcher {

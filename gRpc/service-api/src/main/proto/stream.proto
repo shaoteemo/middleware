@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option java_multiple_files = false;
+
+option java_package = "com.shaoteemo";
+
+option java_outer_classname = "StreamProto";
+
+import "HelloWorld.proto";
+
+service StreamService{
+  /* 服务端流式RPC */
+  rpc serverStream(Request) returns(stream Response){}
+  /* 客户端流式RPC */
+  rpc clientStream(stream Request) returns(Response){}
+  /* 双向流式RPC */
+  rpc bidirectionalStream(stream Request) returns(stream Response){}
+}
