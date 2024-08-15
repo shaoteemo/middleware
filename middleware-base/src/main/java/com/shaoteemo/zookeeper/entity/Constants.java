@@ -5,7 +5,6 @@ package com.shaoteemo.zookeeper.entity;
  * 所属包：com.shaoteemo.zookeeper.entity
  *
  * @author ShaoTeemo
- * @date 2021/10/3
  * @since 1.0
  */
 public class Constants {
