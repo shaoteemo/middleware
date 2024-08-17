@@ -46,8 +46,6 @@ public class RmiClient {
         } catch (IOException | KeeperException | InterruptedException e) {
             logger.error("获取服务{}的连接信息失败!", serviceBeanName, e);
             return "";
-        }finally {
-
         }
     }
 
