@@ -1,0 +1,17 @@
+spring:
+  redis:
+    host: 192.168.2.20
+    port: 6379
+    password:
+    jedis:
+      pool:
+#        连接池最大连接数（负数为没有限制）
+        max-active: 8
+        # 连接池最大阻塞等待时间
+        max-wait: -1
+        # 连接池最大空闲时间连接
+        max-idle: 8
+        # 连接池最小空闲时间连接
+        min-idle: 0
+    # 连接超时
+    timeout: 30000
