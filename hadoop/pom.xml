@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.shaoteemo</groupId>
-        <artifactId>parent</artifactId>
+        <artifactId>middleware</artifactId>
         <version>1.0-SNAPSHOT</version>
-        <relativePath>../parent/pom.xml</relativePath>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <packaging>pom</packaging>
@@ -15,8 +15,6 @@
         <module>hadoop-client-api</module>
         <module>hadoop-mapReduce-wordcount</module>
         <module>practise</module>
-        <module>practise/temperature_count</module>
-        <module>practise/friends_recommend</module>
     </modules>
 
     <artifactId>hadoop</artifactId>
